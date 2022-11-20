@@ -1,17 +1,11 @@
-import { handleFile, normalizeAlphas } from "./utils";
+import { determineColor, normalizeAlphas } from "./utils";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { LASBatch } from "./loader";
 import { LASHeaders } from "./types";
-import vertexShader from "./vertex_shader";
-import fragmentShader from "./fragment_shader";
+import { geometry, material, renderer } from "./globals";
 
-const input = document.getElementById("file-input");
 const glRenderer = document.getElementById("gl-container");
-
-input?.addEventListener("change", (e) => handleFile(e, loadPoints));
-
-const renderer = new THREE.WebGLRenderer();
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(
     75,
@@ -19,24 +13,16 @@ const camera = new THREE.PerspectiveCamera(
     0.1,
     1000
 );
-
 const controls = new OrbitControls(camera, renderer.domElement);
 
-const material = new THREE.ShaderMaterial({
-    vertexShader: vertexShader,
-    fragmentShader: fragmentShader,
-    transparent: true
-});
-
-function loadPoints(header: LASHeaders, batcher: LASBatch[]) {
+export function loadPoints(header: LASHeaders, batcher: LASBatch[]) {
     const [minX, minY, minZ] = header.minimumBounds;
     const [maxX, maxY, maxZ] = header.maximumBounds;
     const [scaleX, scaleY, scaleZ] = header.scale;
     let maxIntensity = 0;
     const colors = [];
     const vertices = [];
-    const geometry = new THREE.BufferGeometry();
-
+    const classifications = [];
     const midX = (maxX - minX) / 2;
     const midY = (maxY - minY) / 2;
 
@@ -50,11 +36,13 @@ function loadPoints(header: LASHeaders, batcher: LASBatch[]) {
             );
 
             colors.push(
-                p.color ? p.color[0] : 255,
-                p.color ? p.color[2] : 255,
-                p.color ? p.color[1] : 255,
-                p.intensity 
-            );
+                determineColor(p.color, p.classification, 0),
+                determineColor(p.color, p.classification, 1),
+                determineColor(p.color, p.classification, 2),
+                p.intensity
+            );  
+                
+            classifications.push(p.classification);
 
             maxIntensity = Math.max(maxIntensity, p.intensity);
         }
@@ -82,8 +70,8 @@ function loadPoints(header: LASHeaders, batcher: LASBatch[]) {
 function positionCamera(header: LASHeaders) {
     const [maxX, maxY, maxZ] = header.maximumBounds;
     const [minX, minY, minZ] = header.minimumBounds;
-    const [distX, distY, distZ] = [maxX - minX, maxY - minY, maxZ - minZ]
-    camera.position.set(0, 2 * distZ, -100)
+    const [distX, distY, distZ] = [maxX - minX, maxY - minY, maxZ - minZ];
+    camera.position.set(0, 2 * distZ, -100);
     // camera.lookAt(new THREE.Vector3(0, maxY - minY, 0));
 
     // const [scaleX, scaleY, scaleZ] = header.scale;
@@ -92,7 +80,7 @@ function positionCamera(header: LASHeaders) {
     // camera.position.set((maxX - minX) / 2, 100, (maxY - minY) / 2);
     // camera.lookAt(new THREE.Vector3((maxX - minX) / 2, 0, (maxY - minY) / 2));
 
-    console.log(camera.position)
+    console.log(camera.position);
 }
 
 function animate() {

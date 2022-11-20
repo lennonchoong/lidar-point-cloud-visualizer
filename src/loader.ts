@@ -1,4 +1,5 @@
 import {
+    dummyLASHeader,
     LASHeaders,
     NumberArrayTypes,
     PointFormat,
@@ -12,7 +13,13 @@ export class LASLoader {
     private readOffset: number;
     public version: number;
 
-    constructor(buffer: ArrayBuffer) {
+    constructor() {
+        this.buffer = new ArrayBuffer(0);
+        this.header = dummyLASHeader
+        this.readOffset = this.version = 0;
+    }  
+
+    loadFile(buffer: ArrayBuffer) {
         this.buffer = buffer;
         this.header = this.getHeaders();
         this.version = this.readVersion();
@@ -91,6 +98,10 @@ export class LASLoader {
     readVersion(): number {
         const version = new Int8Array(this.buffer, 24, 2);
         return version[0] * 10 + version[1];
+    }
+
+    getLoadProgress(): number {
+        return this.readOffset;
     }
 
     loadData(

@@ -1,5 +1,6 @@
+import { loader } from "./globals";
 import { LASBatch, LASLoader } from "./loader";
-import { LASHeaders, PointFormatReader } from "./types";
+import { colorClassifications, LASHeaders, PointFormatReader } from "./types";
 
 export const handleFile = (
     e: Event,
@@ -16,7 +17,7 @@ export const handleFile = (
     fr.onload = async () => {
         const fileBuffer = fr.result;
         if (fileBuffer && typeof fileBuffer !== "string") {
-            const loader = new LASLoader(fileBuffer);
+            loader.loadFile(fileBuffer);
             const header = loader.getHeaders();
             await readLASFileInBatches(loader, header, batcher);
             callback(header, batcher);
@@ -32,14 +33,16 @@ const readLASFileInBatches = (
     batcher: LASBatch[]
 ) => {
     const promise = loader.loadData(10000, 0);
-    return promise.then(({ buffer, count, hasMoreData }): Promise<[LASHeaders, LASBatch[]]> => {
-        batcher.push(new LASBatch(buffer, header, count));
-        if (hasMoreData) {
-            return readLASFileInBatches(loader, header, batcher);
-        } else {
-            return Promise.resolve([header, batcher]);
+    return promise.then(
+        ({ buffer, count, hasMoreData }): Promise<[LASHeaders, LASBatch[]]> => {
+            batcher.push(new LASBatch(buffer, header, count));
+            if (hasMoreData) {
+                return readLASFileInBatches(loader, header, batcher);
+            } else {
+                return Promise.resolve([header, batcher]);
+            }
         }
-    });
+    );
 };
 
 export const pointFormatReaders: { [key: number]: PointFormatReader } = {
@@ -103,4 +106,30 @@ export const normalizeAlphas = (colors: number[], maxIntensity: number) => {
     for (let i = 3; i < colors.length; i += 4) {
         colors[i] = colors[i] / maxIntensity;
     }
+};
+
+export const cleanUp = (
+    geometry: THREE.BufferGeometry,
+    material: THREE.ShaderMaterial,
+    renderer: THREE.WebGLRenderer
+) => {
+    geometry.dispose();
+    material.dispose();
+    renderer.clear();
+};
+
+export const determineColor = (
+    color: number[] | undefined,
+    classification: number | undefined,
+    idx: number
+) => {
+    if (color) {
+        return color[idx] / 255;
+    }
+
+    if (classification && classification in colorClassifications) {
+        return colorClassifications[classification][idx] / 255;
+    }
+
+    return 1
 };
