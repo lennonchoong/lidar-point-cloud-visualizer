@@ -1,6 +1,7 @@
 import { loader } from "./globals";
 import { LASBatch, LASLoader } from "./loader";
 import { colorClassifications, LASHeaders, PointFormatReader } from "./types";
+import { updateProgressBar, hideProgressBar } from "./ui";
 
 export const handleFile = (
     e: Event,
@@ -34,11 +35,14 @@ const readLASFileInBatches = (
 ) => {
     const promise = loader.loadData(10000, 0);
     return promise.then(
-        ({ buffer, count, hasMoreData }): Promise<[LASHeaders, LASBatch[]]> => {
+        ({ buffer, count, cumulativeRead, hasMoreData }): Promise<[LASHeaders, LASBatch[]]> => {
             batcher.push(new LASBatch(buffer, header, count));
+            updateProgressBar(cumulativeRead / header.pointCount);
+            
             if (hasMoreData) {
                 return readLASFileInBatches(loader, header, batcher);
             } else {
+                hideProgressBar();
                 return Promise.resolve([header, batcher]);
             }
         }

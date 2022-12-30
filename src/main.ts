@@ -4,6 +4,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { LASBatch } from "./loader";
 import { LASHeaders } from "./types";
 import { geometry, material, renderer } from "./globals";
+import kmeans from "./kmeans";
 
 const glRenderer = document.getElementById("gl-container");
 const scene = new THREE.Scene();
@@ -98,5 +99,7 @@ function render() {
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 glRenderer?.appendChild(renderer.domElement);
+
+console.log(kmeans([1, 1, 1, 1, 2, 1, -1, -1, -1, -1, -1, -1.5, -1, -1, -1.5], 2))
 
 export {};

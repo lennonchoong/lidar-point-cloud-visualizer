@@ -90,3 +90,31 @@ h1 {
     opacity: 0;
     pointer-events: none;
 }
+
+.hidden {
+    display: none;
+}
+
+.show {
+    display: flex;
+}
+
+#loading-bar {
+    width: 80%;
+    height: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+#loading-bar-filler {
+    background-color: white;
+    height: 100%;
+}
+
+#loading-bar-container {
+    position: absolute;
+    bottom: 0;
+    margin-bottom: 1.5rem;
+    width: 100%;
+    flex-direction: column;
+    align-items: center;
+}

@@ -15,9 +15,9 @@ export class LASLoader {
 
     constructor() {
         this.buffer = new ArrayBuffer(0);
-        this.header = dummyLASHeader
+        this.header = dummyLASHeader;
         this.readOffset = this.version = 0;
-    }  
+    }
 
     loadFile(buffer: ArrayBuffer) {
         this.buffer = buffer;
@@ -101,13 +101,19 @@ export class LASLoader {
     }
 
     getLoadProgress(): number {
-        return this.readOffset;
+        console.log(this.readOffset, this.header.pointCount);
+        return this.readOffset / this.header.pointCount;
     }
 
     loadData(
         count: number,
         skip: number
-    ): Promise<{ buffer: ArrayBuffer; count: number; hasMoreData: boolean }> {
+    ): Promise<{
+        buffer: ArrayBuffer;
+        count: number;
+        cumulativeRead: number;
+        hasMoreData: boolean;
+    }> {
         return new Promise((response) => {
             let start;
             if (skip <= 1) {
@@ -122,6 +128,7 @@ export class LASLoader {
                 response({
                     buffer: this.buffer.slice(start, end),
                     count: count,
+                    cumulativeRead: this.readOffset + count,
                     hasMoreData:
                         this.readOffset + count < this.header.pointCount,
                 });
@@ -157,6 +164,7 @@ export class LASLoader {
                 response({
                     buffer: buf.buffer,
                     count: pointsRead,
+                    cumulativeRead: this.readOffset,
                     hasMoreData: this.readOffset < this.header.pointCount,
                 });
             }
