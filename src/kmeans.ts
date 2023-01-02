@@ -196,11 +196,12 @@ function recalculateCentroids(
     return newCentroidList;
 }
 
-function kmeans(dataset: number[], k: number) {
+function kMeansHelper(dataset: number[], k: number) {
     if (dataset.length && dataset.length > k) {
         // Initialize book keeping variables
         let iterations = 0;
-        let oldCentroids, labels;
+        let labels = {};
+        let oldCentroids;
 
         // Initialize centroids randomly
         let centroids: number[] = getRandomCentroids(dataset, k);
@@ -214,22 +215,64 @@ function kmeans(dataset: number[], k: number) {
             centroids = recalculateCentroids(dataset, labels);
         }
 
-        return centroids;
+        return {
+            labels: labels,
+            centroids: centroids,
+        };
     } else {
         throw new Error("Invalid dataset");
     }
 }
 
-// Cloud (X):
-// 2: Let N = number of points in X
-// 3: Init a list D, of size N/2
-// 4: Let D[0] = 0
-// 5: for k = 1 . . . N/2 do
-// 6: cluster X with k clusters (e.g. with k-means)
-// 7: D[k] = L (k)
-// 8: Define J of size (N/2) − 1, with J(0) = 0
-// 9: for i = 1 . . . N/2 − 2 do
-// 10: J(i) = D[i] − D[i + 1]
-// 11: Return the k between 1 and N/2 that maximizes J
+const elbowCostFunction = (labels: PointKMeanMetadata[]) => {
+    let cost = 0;
+    for (const label of labels) {
+        const [centroidX, centroidY, centroidZ] = label.centroid;
+        const points = label.points;
+        for (let i = 0; i < points.length; i += 3) {
+            const [diffX, diffY, diffZ] = [
+                centroidX - points[i],
+                centroidY - points[i + 1],
+                centroidZ - points[i + 2],
+            ];
 
-export default kmeans;
+            cost += diffX * diffX + diffY * diffY + diffZ * diffZ;
+        }
+    }
+
+    return cost;
+};
+
+const elbowMethod = (dataSet: number[]) => {
+    const d = [0];
+    const mapping: { [key: number]: { labels: {}; centroids: number[] } } = {};
+    const n = dataSet.length / 3;
+    let maxJ = Number.MIN_VALUE;
+    let maxJIndex = 1;
+
+    for (let i = 1; i <= n / 2; i++) {
+        const clusteringResult = kMeansHelper(dataSet, i);
+        mapping[i] = clusteringResult;
+        d.push(elbowCostFunction(Object.values(clusteringResult.labels)));
+    }
+
+    for (let i = 0; i < n / 2 - 1; i++) {
+        if (d[i] - d[i + 1] > maxJ) {
+            maxJ = d[i] - d[i + 1];
+            maxJIndex = i + 1;
+        }
+    }
+
+    return mapping[maxJIndex];
+};
+
+const kMeansClustering = (dataSet: number[]) => {
+    if (dataSet.length <= 3) {
+        return { labels: {}, centroids: [] };
+    }
+
+    // return elbowMethod(dataSet);
+    return kMeansHelper(dataSet, 2);
+};
+
+export default kMeansClustering;

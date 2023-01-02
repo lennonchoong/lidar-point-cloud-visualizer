@@ -11,4 +11,5 @@ export const material = new THREE.ShaderMaterial({
     vertexShader: vertexShader,
     fragmentShader: fragmentShader,
     transparent: true,
+    
 });

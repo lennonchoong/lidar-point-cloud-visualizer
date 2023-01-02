@@ -1,5 +1,7 @@
+import kMeansClustering from "./kmeans";
+
 class Octree {
-    maxDepth = 1;
+    granularity = 1;
     root = new OctreeNode(0, 0, 0, 0, 0, 0);
     x1 = 0;
     x2 = 0;
@@ -9,7 +11,7 @@ class Octree {
     z2 = 0;
 
     constructor(
-        maxDepth: number,
+        granularity: number,
         x1: number,
         x2: number,
         y1: number,
@@ -17,7 +19,7 @@ class Octree {
         z1: number,
         z2: number
     ) {
-        this.maxDepth = maxDepth;
+        this.granularity = granularity;
         this.root = this.generate(x1, x2, y1, y2, z1, z2, 0);
     }
 
@@ -34,8 +36,7 @@ class Octree {
         const midX = x1 + (x2 - x1) / 2;
         const midY = y1 + (y2 - y1) / 2;
         const midZ = z1 + (z2 - z1) / 2;
-
-        if (depth <= this.maxDepth) {
+        if (depth < this.granularity) {
             node.children = [
                 this.generate(x1, midX, y1, midY, z1, midZ, depth + 1),
                 this.generate(x1, midX, midY, y2, z1, midZ, depth + 1),
@@ -51,11 +52,19 @@ class Octree {
     }
 
     addPoint(x: number, y: number, z: number) {
-        this.addPointHelper(x, y, z, this.root);
+        this.addPointHelper(x, y, z, this.root, 0);
     }
 
-    addPointHelper(x: number, y: number, z: number, node: OctreeNode) {
-        node.points.push(x, y, z);
+    addPointHelper(
+        x: number,
+        y: number,
+        z: number,
+        node: OctreeNode,
+        depth: number
+    ) {
+        if (depth === this.granularity) {
+            node.points.push(x, y, z);
+        }
 
         for (let c of node.children) {
             if (
@@ -66,23 +75,52 @@ class Octree {
                 c.z1 <= z &&
                 z <= c.z2
             ) {
-                this.addPointHelper(x, y, z, c);
+                this.addPointHelper(x, y, z, c, depth + 1);
                 break;
             }
         }
     }
 
-    pruneOctree() {
-        
+    // pruneOctree() {
+
+    // }
+
+    getPoints(): number[] {
+        const points: number[] = [];
+        this.getPointsHelper(this.root, points);
+        return points;
+    }
+
+    getPointsHelper(node: OctreeNode, points: number[]) {
+        if (!node.children.length) {
+            node.points.forEach((e) => points.push(e));
+        }
+
+        for (const child of node.children) {
+            this.getPointsHelper(child, points);
+        }
+    }
+
+    optimize() {
+        this.clusterPoints(this.root);
     }
 
     clusterPoints(node: OctreeNode) {
+        if (!node.children.length) {
+            node.points = kMeansClustering(node.points).centroids;
+        }
+
         for (let child of node.children) {
             this.clusterPoints(child);
         }
 
-        const points = node.points;
-
+        // if ) {
+        //     console.log(node.points.length);
+        // } 
+        // else {
+        //     console.log(childPoints);
+        //     node.points = kMeansClustering(childPoints).centroids;
+        // }
     }
 }
 

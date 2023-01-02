@@ -4,7 +4,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { LASBatch } from "./loader";
 import { LASHeaders } from "./types";
 import { geometry, material, renderer } from "./globals";
-import kmeans from "./kmeans";
+import Octree from "./octree";
 
 const glRenderer = document.getElementById("gl-container");
 const scene = new THREE.Scene();
@@ -20,41 +20,51 @@ export function loadPoints(header: LASHeaders, batcher: LASBatch[]) {
     const [minX, minY, minZ] = header.minimumBounds;
     const [maxX, maxY, maxZ] = header.maximumBounds;
     const [scaleX, scaleY, scaleZ] = header.scale;
+    console.log("generating Octree");
     let maxIntensity = 0;
     const colors = [];
     const vertices = [];
     const classifications = [];
     const midX = (maxX - minX) / 2;
     const midY = (maxY - minY) / 2;
-
+    const octree = new Octree(7, -midX, midX, 0, maxZ - minZ, -midY, midY);
+    let total = 0;
     for (const batch of batcher) {
+        total += batch.count;
         for (let i = 0; i < batch.count; i++) {
             const p = batch.getPoint(i);
-            vertices.push(
+            octree.addPoint(
                 p.position[0] * scaleX - minX - midX,
                 p.position[2] * scaleZ - minZ,
-                p.position[1] * scaleY - minY - midY
-            );
+                p.position[1] * scaleY - minY - midY,
+            )
+            // colors.push(
+            //     determineColor(p.color, p.classification, 0),
+            //     determineColor(p.color, p.classification, 1),
+            //     determineColor(p.color, p.classification, 2),
+            //     p.intensity
+            // );
+            
+            // classifications.push(p.classification);
 
-            colors.push(
-                determineColor(p.color, p.classification, 0),
-                determineColor(p.color, p.classification, 1),
-                determineColor(p.color, p.classification, 2),
-                p.intensity
-            );  
-                
-            classifications.push(p.classification);
-
-            maxIntensity = Math.max(maxIntensity, p.intensity);
+            // maxIntensity = Math.max(maxIntensity, p.intensity);
         }
     }
 
+    octree.optimize();
+
+    console.log("octree.optimize");
+
+    const optimizedPoints = octree.getPoints();
+    
     geometry.setAttribute(
         "position",
-        new THREE.Float32BufferAttribute(vertices, 3)
+        new THREE.Float32BufferAttribute(optimizedPoints, 3)
     );
 
-    normalizeAlphas(colors, maxIntensity);
+    for (let i = 0; i < optimizedPoints.length / 3; i++) {
+        colors.push(255, 255, 255, 1);
+    }
 
     geometry.setAttribute(
         "colors",
@@ -99,7 +109,5 @@ function render() {
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 glRenderer?.appendChild(renderer.domElement);
-
-console.log(kmeans([1, 1, 1, 1, 2, 1, -1, -1, -1, -1, -1, -1.5, -1, -1, -1.5], 2))
 
 export {};
