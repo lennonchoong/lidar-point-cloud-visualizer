@@ -21,14 +21,13 @@ export function loadPoints(header: LASHeaders, batcher: LASBatch[]) {
     const [maxX, maxY, maxZ] = header.maximumBounds;
     const [scaleX, scaleY, scaleZ] = header.scale;
     console.log("generating Octree");
-    let maxIntensity = 0;
     const colors = [];
     const vertices = [];
-    const classifications = [];
     const midX = (maxX - minX) / 2;
     const midY = (maxY - minY) / 2;
     const octree = new Octree(7, -midX, midX, 0, maxZ - minZ, -midY, midY);
     let total = 0;
+    console.time("points")
     for (const batch of batcher) {
         total += batch.count;
         for (let i = 0; i < batch.count; i++) {
@@ -37,34 +36,39 @@ export function loadPoints(header: LASHeaders, batcher: LASBatch[]) {
                 p.position[0] * scaleX - minX - midX,
                 p.position[2] * scaleZ - minZ,
                 p.position[1] * scaleY - minY - midY,
-            )
-            // colors.push(
-            //     determineColor(p.color, p.classification, 0),
-            //     determineColor(p.color, p.classification, 1),
-            //     determineColor(p.color, p.classification, 2),
-            //     p.intensity
-            // );
-            
-            // classifications.push(p.classification);
-
-            // maxIntensity = Math.max(maxIntensity, p.intensity);
+                determineColor(p.color, p.classification, 0),
+                determineColor(p.color, p.classification, 1),
+                determineColor(p.color, p.classification, 2),
+                p.intensity
+            );
         }
     }
 
+    console.log("Optimizing octree");
+
     octree.optimize();
 
-    console.log("octree.optimize");
+    console.log("Done optimizing octree");
 
     const optimizedPoints = octree.getPoints();
-    
+    for (let i = 0; i < optimizedPoints.length; i += 7) {
+        vertices.push(
+            optimizedPoints[i],
+            optimizedPoints[i + 1],
+            optimizedPoints[i + 2]
+        );
+        colors.push(
+            optimizedPoints[i + 3],
+            optimizedPoints[i + 4],
+            optimizedPoints[i + 5],
+            optimizedPoints[i + 6] / octree.maxAlpha
+        );
+    }
+
     geometry.setAttribute(
         "position",
-        new THREE.Float32BufferAttribute(optimizedPoints, 3)
+        new THREE.Float32BufferAttribute(vertices, 3)
     );
-
-    for (let i = 0; i < optimizedPoints.length / 3; i++) {
-        colors.push(255, 255, 255, 1);
-    }
 
     geometry.setAttribute(
         "colors",
@@ -76,6 +80,8 @@ export function loadPoints(header: LASHeaders, batcher: LASBatch[]) {
     scene.add(new THREE.Points(geometry, material));
 
     animate();
+
+    console.timeEnd("points")
 }
 
 function positionCamera(header: LASHeaders) {

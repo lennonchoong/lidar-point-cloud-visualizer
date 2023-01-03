@@ -35,10 +35,15 @@ const readLASFileInBatches = (
 ) => {
     const promise = loader.loadData(10000, 0);
     return promise.then(
-        ({ buffer, count, cumulativeRead, hasMoreData }): Promise<[LASHeaders, LASBatch[]]> => {
+        ({
+            buffer,
+            count,
+            cumulativeRead,
+            hasMoreData,
+        }): Promise<[LASHeaders, LASBatch[]]> => {
             batcher.push(new LASBatch(buffer, header, count));
             updateProgressBar(cumulativeRead / header.pointCount);
-            
+
             if (hasMoreData) {
                 return readLASFileInBatches(loader, header, batcher);
             } else {
@@ -135,5 +140,13 @@ export const determineColor = (
         return colorClassifications[classification][idx] / 255;
     }
 
-    return 1
+    return 1;
+};
+
+export const gcd = (m: number, n: number): number => {
+    if (n === 0) return m;
+
+    if (n > m) return gcd(n, m);
+
+    return gcd(n, m % n);
 };

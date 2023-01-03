@@ -4,45 +4,9 @@ const randomBetween = (min: number, max: number): number => {
     return Math.floor(Math.random() * (max - min) + min);
 };
 
-// const calcMeanCentroid = (dataSet: number[], start: number, end: number) => {
-//     const features = dataSet[0].length;
-//     const n = end - start;
-//     let mean = [];
-//     for (let i = 0; i < features; i++) {
-//         mean.push(0);
-//     }
-
-//     for (let i = start; i < end; i++) {
-//         for (let j = 0; j < features; j++) {
-//             mean[j] = mean[j] + dataSet[i][j] / n;
-//         }
-//     }
-
-//     return mean;
-// };
-
-// function getRandomCentroidsNaiveSharding(dataset, k) {
-//     // implementation of a variation of naive sharding centroid initialization method
-//     // (not using sums or sorting, just dividing into k shards and calc mean)
-//     // https://www.kdnuggets.com/2017/03/naive-sharding-centroid-initialization-method.html
-//     const numSamples = dataset.length;
-//     // Divide dataset into k shards:
-//     const step = Math.floor(numSamples / k);
-//     const centroids = [];
-//     for (let i = 0; i < k; i++) {
-//         const start = step * i;
-//         let end = step * (i + 1);
-//         if (i + 1 === k) {
-//             end = numSamples;
-//         }
-//         centroids.push(calcMeanCentroid(dataset, start, end));
-//     }
-//     return centroids;
-// }
-
 const getRandomCentroids = (dataset: number[], k: number) => {
     // selects random points as centroids from the dataset
-    const numSamples = dataset.length / 3;
+    const numSamples = dataset.length / 7;
     const centroidsIndex: number[] = [];
     let i;
     while (centroidsIndex.length < k) {
@@ -53,9 +17,13 @@ const getRandomCentroids = (dataset: number[], k: number) => {
     const centroids = [];
     for (let i = 0; i < centroidsIndex.length; i++) {
         centroids.push(
-            dataset[centroidsIndex[i] * 3],
-            dataset[centroidsIndex[i] * 3 + 1],
-            dataset[centroidsIndex[i] * 3 + 2]
+            dataset[centroidsIndex[i] * 7],
+            dataset[centroidsIndex[i] * 7 + 1],
+            dataset[centroidsIndex[i] * 7 + 2],
+            dataset[centroidsIndex[i] * 7 + 3],
+            dataset[centroidsIndex[i] * 7 + 4],
+            dataset[centroidsIndex[i] * 7 + 5],
+            dataset[centroidsIndex[i] * 7 + 6]
         );
     }
     return centroids;
@@ -73,7 +41,7 @@ const shouldStop = (
         return false;
     }
     let sameCount = true;
-    for (let i = 0; i < centroids.length; i += 3) {
+    for (let i = 0; i < centroids.length; i += 7) {
         if (
             centroids[i] != oldCentroids[i] ||
             centroids[i + 1] != oldCentroids[i + 1] ||
@@ -108,21 +76,37 @@ function getLabels(dataSet: number[], centroids: number[]) {
     // prep data structure:
     const labels: { [key: number]: PointKMeanMetadata } = {};
 
-    for (let c = 0; c < centroids.length; c += 3) {
+    for (let c = 0; c < centroids.length; c += 7) {
         labels[c] = {
             points: [],
-            centroid: [centroids[c], centroids[c + 1], centroids[c + 2]],
+            centroid: [
+                centroids[c],
+                centroids[c + 1],
+                centroids[c + 2],
+                centroids[c + 3],
+                centroids[c + 4],
+                centroids[c + 5],
+                centroids[c + 6],
+            ],
         };
     }
     // For each element in the dataset, choose the closest centroid.
     // Make that centroid the element's label.
-    for (let i = 0; i < dataSet.length; i += 3) {
-        const [x1, y1, z1] = [dataSet[i], dataSet[i + 1], dataSet[i + 2]];
+    for (let i = 0; i < dataSet.length; i += 7) {
+        const [x1, y1, z1, r1, g1, b1, alpha1] = [
+            dataSet[i],
+            dataSet[i + 1],
+            dataSet[i + 2],
+            dataSet[i + 3],
+            dataSet[i + 4],
+            dataSet[i + 5],
+            dataSet[i + 6],
+        ];
         let closestCentroidX, closestCentroidY, closestCentroidZ;
         let closestCentroidIndex = 0;
         let prevDistance = 0;
 
-        for (let j = 0; j < centroids.length; j += 3) {
+        for (let j = 0; j < centroids.length; j += 7) {
             if (j === 0) {
                 closestCentroidX = centroids[j];
                 closestCentroidY = centroids[j + 1];
@@ -156,19 +140,39 @@ function getLabels(dataSet: number[], centroids: number[]) {
             }
         }
         // add point to centroid labels:
-        labels[closestCentroidIndex].points.push(x1, y1, z1);
+        labels[closestCentroidIndex].points.push(
+            x1,
+            y1,
+            z1,
+            r1,
+            g1,
+            b1,
+            alpha1
+        );
     }
     return labels;
 }
 
 function getPointsMean(pointList: number[]) {
-    const totalPoints = pointList.length / 3;
-    const means = [0, 0, 0];
-    for (let i = 0; i < pointList.length; i += 3) {
-        const [x, y, z] = [pointList[i], pointList[i + 1], pointList[i + 2]];
+    const totalPoints = pointList.length / 7;
+    const means = [0, 0, 0, 0, 0, 0, 0];
+    for (let i = 0; i < pointList.length; i += 7) {
+        const [x, y, z, r, g, b, alpha] = [
+            pointList[i],
+            pointList[i + 1],
+            pointList[i + 2],
+            pointList[i + 3],
+            pointList[i + 4],
+            pointList[i + 5],
+            pointList[i + 6],
+        ];
         means[0] = means[0] + x / totalPoints;
         means[1] = means[1] + y / totalPoints;
         means[2] = means[2] + z / totalPoints;
+        means[3] = means[3] + r / totalPoints;
+        means[4] = means[4] + g / totalPoints;
+        means[5] = means[5] + b / totalPoints;
+        means[6] = Math.max(means[6], alpha);
     }
     return means;
 }
@@ -189,9 +193,17 @@ function recalculateCentroids(
             newCentroid = getPointsMean(centroidGroup.points);
         } else {
             // get new random centroid
-            newCentroid = getRandomCentroids(dataSet, 1).slice(3);
+            newCentroid = getRandomCentroids(dataSet, 1).slice(7);
         }
-        newCentroidList.push(newCentroid[0], newCentroid[1], newCentroid[2]);
+        newCentroidList.push(
+            newCentroid[0],
+            newCentroid[1],
+            newCentroid[2],
+            newCentroid[3],
+            newCentroid[4],
+            newCentroid[5],
+            newCentroid[6]
+        );
     }
     return newCentroidList;
 }
@@ -229,7 +241,7 @@ const elbowCostFunction = (labels: PointKMeanMetadata[]) => {
     for (const label of labels) {
         const [centroidX, centroidY, centroidZ] = label.centroid;
         const points = label.points;
-        for (let i = 0; i < points.length; i += 3) {
+        for (let i = 0; i < points.length; i += 7) {
             const [diffX, diffY, diffZ] = [
                 centroidX - points[i],
                 centroidY - points[i + 1],
@@ -246,7 +258,7 @@ const elbowCostFunction = (labels: PointKMeanMetadata[]) => {
 const elbowMethod = (dataSet: number[]) => {
     const d = [0];
     const mapping: { [key: number]: { labels: {}; centroids: number[] } } = {};
-    const n = dataSet.length / 3;
+    const n = dataSet.length / 7;
     let maxJ = Number.MIN_VALUE;
     let maxJIndex = 1;
 
@@ -267,7 +279,7 @@ const elbowMethod = (dataSet: number[]) => {
 };
 
 const kMeansClustering = (dataSet: number[]) => {
-    if (dataSet.length <= 3) {
+    if (dataSet.length <= 7) {
         return { labels: {}, centroids: [] };
     }
 
