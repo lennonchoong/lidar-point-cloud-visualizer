@@ -1,6 +1,6 @@
 package octree
 
-import "../kmeans"
+// import "github.com/lennonchoong/lidar-point-cloud-visualizer/tree/master/server/kmeans"
 
 type OctreeNode struct {
 	points []float64
