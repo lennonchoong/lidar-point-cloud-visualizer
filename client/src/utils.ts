@@ -2,6 +2,7 @@ import { loader } from "./globals";
 import { LASBatch, LASLoader } from "./loader";
 import { colorClassifications, LASHeaders, PointFormatReader } from "./types";
 import { updateProgressBar, hideProgressBar } from "./ui";
+import HugeUploader from "huge-uploader";
 
 export const handleFile = (
     e: Event,
@@ -11,20 +12,36 @@ export const handleFile = (
 
     if (!currentTarget.files) return;
 
+    const uploader = new HugeUploader({
+        endpoint: "http://localhost:8080/upload",
+        file: currentTarget.files[0],
+        chunkSize: 10,
+        headers: {
+            sessionId: window.sessionId
+        }
+    });
+
+    uploader.on("finish", () => {
+        console.log("done");
+    });
+
     const fr = new FileReader();
 
     const batcher: LASBatch[] = [];
 
     fr.onload = async () => {
+        console.time('points')
         const fileBuffer = fr.result;
         if (fileBuffer && typeof fileBuffer !== "string") {
             loader.loadFile(fileBuffer);
             const header = loader.getHeaders();
+            console.log(header);
             await readLASFileInBatches(loader, header, batcher);
             callback(header, batcher);
         }
     };
 
+    // console.log(currentTarget.files[0].size)
     fr.readAsArrayBuffer(currentTarget.files[0]);
 };
 
@@ -48,6 +65,7 @@ const readLASFileInBatches = (
                 return readLASFileInBatches(loader, header, batcher);
             } else {
                 hideProgressBar();
+                console.timeEnd('points')
                 return Promise.resolve([header, batcher]);
             }
         }

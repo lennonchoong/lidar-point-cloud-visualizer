@@ -1,10 +1,10 @@
 package kmeans
 
 import (
-	"golang.org/x/exp/rand"
-	"golang.org/x/exp/slices"
 	"math"
 	"golang.org/x/exp/maps"
+	"golang.org/x/exp/rand"
+	"golang.org/x/exp/slices"
 )
 
 var pointOffset int = 7
@@ -21,7 +21,7 @@ type ClusterResult struct {
 }
 
 func randomBetween(min, max int) int {
-	return int(rand.Float64() * (max - min) + min);
+	return rand.Intn(max - min) + min
 }
 
 func getRandomCentroids(points []float64, k int) []float64 {
@@ -40,7 +40,7 @@ func getRandomCentroids(points []float64, k int) []float64 {
 	centroids := [] float64{}
 	for _, idx := range centroidIndexes {
 		centroids = append(centroids,
-			points[idx * pointOffset : idx * 7 + 8]...
+			points[idx * pointOffset : (idx + 1) * pointOffset]...
 		)
 	}
 
@@ -81,15 +81,15 @@ func getLabels(points, centroids []float64) map[int]*ClusterLabels {
 	for i := 0; i < len(centroids); i += pointOffset {
 		labels[i] = &ClusterLabels {
 			points: []float64{}, 
-			centroids: centroids[i: i + 8],
+			centroids: centroids[i: i + pointOffset],
 		}
 	}
-
+	
 	for i := 0; i < len(points); i += pointOffset {
 		x1, y1, z1, r1, g1, b1, alpha1 := points[i], points[i + 1], points[i + 2], points[i + 3], points[i + 4], points[i + 5], points[i + 6];
 		closestCentroidX, closestCentroidY, closestCentroidZ, closestCentroidIndex, prevDistance := 0.0, 0.0, 0.0, 0 ,0.0;
 		
-		for j := 0; j < len(centroids); i += pointOffset {
+		for j := 0; j < len(centroids); j += pointOffset {
 			if j == 0 {
 				closestCentroidX, closestCentroidY, closestCentroidZ, closestCentroidIndex = centroids[j], centroids[j + 1], centroids[j + 2], j;
 				prevDistance = getDistanceSquared(x1, y1, z1, closestCentroidX, closestCentroidY, closestCentroidZ);
@@ -101,27 +101,27 @@ func getLabels(points, centroids []float64) map[int]*ClusterLabels {
 					closestCentroidIndex = j
 				}
 			}
-
-		labels[closestCentroidIndex].points = append(labels[closestCentroidIndex].points, x1, y1, z1, r1, g1, b1, alpha1)
 		}
+		labels[closestCentroidIndex].points = append(labels[closestCentroidIndex].points, x1, y1, z1, r1, g1, b1, alpha1)
 	}
 
 	return labels;
 }
 
 func getPointsMean(points []float64) []float64 {
-	totalPoints := float64(len(points) / 7);
+	totalPoints := float64(len(points) / pointOffset);
 	means := []float64{0, 0, 0, 0, 0, 0, 0}
 
-	for i := 0; i < len(points); i++ {
+	for i := 0; i < len(points); i += pointOffset {
 		means[0] = means[0] + points[i] / totalPoints;
 		means[1] = means[1] + points[i + 1] / totalPoints;
 		means[2] = means[2] + points[i + 2] / totalPoints;
 		means[3] = means[3] + points[i + 3] / totalPoints;
 		means[4] = means[4] + points[i + 4] / totalPoints;
 		means[5] = means[5] + points[i + 5] / totalPoints;
-		means[6] = math.Max(means[6], points[i]);
+		means[6] = math.Max(means[6], points[i + 6]);
 	}
+
 	return means;
 }
 
@@ -131,42 +131,41 @@ func recalculateCentroids(points []float64, labels map[int]*ClusterLabels) []flo
 
 	for _, group := range labels {
 		if len(group.points) > 0 {
-			newCentroid = getPointsMean(group.points)[:];
+			newCentroid = getPointsMean(group.points);
 		} else {
-			newCentroid = getRandomCentroids(points, 1)[:7];
+			newCentroid = getRandomCentroids(points, 1)[:pointOffset];
 		}
 		newCentroidList = append(newCentroidList, newCentroid...)
 	}
 	return newCentroidList
 }
 
-func kMeansHelper(points []float64, k int) ClusterResult {
+func kMeansHelper(points []float64, k int) *ClusterResult {
 	if len(points) != 0 && len(points) > k {
 		iterations := 0;
 		labels := make(map[int]*ClusterLabels)
 		centroids := getRandomCentroids(points, k)
-		oldCentroids := []float64{}
-
+		oldCentroids := make([]float64, k * pointOffset)
 		for !shouldStop(oldCentroids, centroids, iterations) {
-			oldCentroids = centroids[:]
+			copy(oldCentroids, centroids)
 			iterations++;
 			labels = getLabels(points, centroids);
 			centroids = recalculateCentroids(points, labels);
 		}
 
-		return ClusterResult{
+		return &ClusterResult{
 			labels,
 			centroids,
 		}
 	}
 
-	return ClusterResult{
+	return &ClusterResult{
 		nil,
 		[]float64 {},
 	}
 }
 
-func elbowCostFunction(labels []ClusterLabels) float64 {
+func elbowCostFunction(labels []*ClusterLabels) float64 {
 	cost := 0.0
 	for _, label := range labels {
 		centroidX, centroidY, centroidZ := label.centroids[0], label.centroids[1], label.centroids[2]
@@ -190,7 +189,7 @@ func elbowMethod(points []float64) *ClusterResult{
 
 	for i := 1; i <= n / 2; i++ {
 		clusteringResult := kMeansHelper(points, i);
-		mapping[i] = &clusteringResult;
+		mapping[i] = clusteringResult;
 		d = append(d, elbowCostFunction(maps.Values(clusteringResult.labels)));
 	}
 
@@ -204,10 +203,9 @@ func elbowMethod(points []float64) *ClusterResult{
 	return mapping[maxJIndex];
 }
 
-func KMeansClustering(points []float64) ClusterResult {
-	// if (len(points) <= pointOffset) {
-	// 	return 
-	// }
-
-	return kMeansHelper(points, 2);
+func KMeansClustering(points []float64) []float64 {
+	if (len(points) <= pointOffset) {
+		return points;
+	}
+	return elbowMethod(points).centroids;
 }

@@ -1,6 +1,8 @@
 package octree
 
-// import "github.com/lennonchoong/lidar-point-cloud-visualizer/tree/master/server/kmeans"
+import (
+	"lidar/kmeans"
+)
 
 type OctreeNode struct {
 	points []float64
@@ -78,7 +80,8 @@ func GetPoints(root *OctreeNode, arr *[]float64) {
 
 func ClusterPoints(root *OctreeNode) {
 	if (len(root.children) <= 0) {
-		root.children = kmeans.KMeansClustering(root.children);
+		root.points = kmeans.KMeansClustering(root.points);
+		return
 	}
 
 	for _, child := range root.children {

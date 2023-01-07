@@ -1,33 +1,86 @@
 package main
 
 import (
-	// "github.com/gin-gonic/gin"
-	"fmt"
-	"github.com/lennonchoong/lidar-point-cloud-visualizer/tree/master/server/octree"
+	"strconv"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
+	"github.com/google/uuid"
+	// "lidar/octree"
+	"lidar/loader"
 	// "log"
-	// "net/http"
+	"fmt"
+	"net/http"
 )
 
-func main() {
-	granularity := 3;
-	root := *octree.GenerateOctree(0, 10 , 0 ,10 , 0, 10, 0, granularity);
-	fmt.Print(root);
-	octree.AddPoint(1, 1, 1, 1, 1, 1, 1, 0, granularity, &root);
-	octree.AddPoint(2, 2, 2, 2, 2, 2, 2, 0, granularity, &root);
-	octree.AddPoint(3, 3, 3, 3, 3, 3, 3, 0, granularity, &root);
-	octree.AddPoint(4, 4, 4, 4, 4, 4, 4, 0, granularity, &root);
-	octree.AddPoint(5, 5, 5, 5, 5, 5, 5, 0, granularity, &root);
-	octree.AddPoint(6, 6, 6, 6, 6, 6, 6, 0, granularity, &root);
-	octree.AddPoint(7, 7, 7, 7, 7, 7, 7, 0, granularity, &root);
-	arr := []int{};
-	octree.GetPoints(&root, &arr);
+type SessionIdEvent struct {
+	Event string 
+	SessionId string
+}
 
-	fmt.Println(arr);
-	// r := gin.Default()
-	// r.GET("/ping", func(c *gin.Context) {
-	// 	c.JSON(200, gin.H{
-	// 		"message": "pong",
-	// 	})
-	// })
-	// r.Run() // listen and serve on 0.0.0.0:8080
+func main() {
+	socketMapping := make(map[string]*websocket.Conn)
+
+	r := gin.Default()
+
+	r.Use(cors.New(cors.Config{
+        AllowOrigins:     []string{"*"},
+        AllowMethods:     []string{"POST", "OPTIONS"},
+        AllowHeaders:     []string{"*"},
+        ExposeHeaders:    []string{"Content-Length"},
+        AllowCredentials: true,
+    }))
+
+	userFiles := make(map[string][]*loader.FilePart)
+
+	r.GET("/ws", func(c *gin.Context) {
+		ws, err := websocket.Upgrade(c.Writer, c.Request, nil, 5120, 5120);
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		sessionId := uuid.NewString()
+		socketMapping[sessionId] = ws;
+
+		err = ws.WriteJSON(SessionIdEvent{
+			Event: "sessionId",
+			SessionId: sessionId,
+		})
+
+		if err != nil {
+			fmt.Println(err)
+		}
+	})
+
+	r.POST("/upload", func(c *gin.Context) {
+		uploadFile, _ := c.FormFile("file")
+
+		uploaderId := c.Request.Header.Get("Uploader-File-Id")
+		chunkNumber, _ := strconv.Atoi(c.Request.Header.Get("Uploader-Chunk-Number"))
+		totalChunks, _ := strconv.Atoi(c.Request.Header.Get("Uploader-Chunks-Total"))
+		sessionId := c.Request.Header.Get("Sessionid")
+		filePart := loader.FilePart{
+			File: uploadFile,
+			UploaderId: uploaderId,
+			ChunkNumber: chunkNumber,
+			TotalChunks: totalChunks,
+		}
+
+		_, exists := userFiles[uploaderId]
+
+		if !exists {
+			fmt.Println(c.Request.Header)
+			userFiles[uploaderId] = []*loader.FilePart{}
+		}
+
+		userFiles[uploaderId] = append(userFiles[uploaderId], &filePart)
+
+		if (len(userFiles[uploaderId]) == totalChunks) {
+			go loader.ProcessFileParts(userFiles[uploaderId], socketMapping[sessionId])
+		}
+		c.String(http.StatusOK, "Data received");
+	})
+
+	r.Run() // listen and serve on 0.0.0.0:8080
 }
