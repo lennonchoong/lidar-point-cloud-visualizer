@@ -5,7 +5,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	"mime/multipart"
 	"time"
+	"lidar/structs"
 )
 
 const (
@@ -108,4 +110,84 @@ func ReadFloat64Multiple(buf []byte, offset int64, repeat int) []float64 {
 func TimeTrack(start time.Time, name string) {
     elapsed := time.Since(start)
     log.Printf("%s took %s", name, elapsed)
+}
+
+func MinInt64(a int64, b int64) int64 {
+	if a > b {
+		return b
+	}
+	return a
+}
+
+func MinUInt32(a, b uint32) uint32 {
+	if a > b {
+		return b
+	}
+	return a
+}
+
+func PrintFilePartStruct(part *structs.FilePart) {
+	fmt.Println(
+		part.ChunkNumber,
+		part.TotalChunks,
+		part.UploaderId,
+		part.File.Filename,
+		part.File.Header,
+		part.File.Size,
+	)
+}
+
+func PrintLoadError(e error) {
+	if e != nil {
+		fmt.Println(e)
+	}
+}
+
+func ReadNextBytes(file *multipart.File, number int) []byte {
+	bytes := make([]byte, number)
+
+	_, err := (*file).Read(bytes)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return bytes
+}
+
+func CheckFileErrors(e error) {
+	if e != nil {
+		log.Fatal(e)
+	}
+}
+
+func DetermineColor(color uint16, classification uint8, idx int) float64 {
+	if color != 0 {
+		return float64(color) / 255;
+	}
+
+	if classification > 0 && classification >= 2 {
+		return ColorClassifications[classification][idx] / 255;
+	}
+
+	return 1.0;
+}
+
+var ColorClassifications [][3]float64 = [][3]float64{
+	{0, 0, 0},
+	{0, 0, 0},
+	{161, 82, 46},
+	{0, 255, 1},
+	{0, 204, 0},
+	{0, 153, 0},
+	{255, 168, 0},
+	{255, 0, 255},
+	{0, 0, 255},
+	{255, 255, 0},
+	{255, 255, 255},
+	{255, 255, 0},
+	{255, 255, 0},
+	{255, 255, 0},
+	{255, 255, 0},
+	{255, 255, 0},
+	{255, 255, 0},
 }

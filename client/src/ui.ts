@@ -1,4 +1,4 @@
-import { geometry, loader, material, renderer } from "./globals";
+import { geometry, material, renderer } from "./globals";
 import { loadPoints } from "./main";
 import { cleanUp, handleFile } from "./utils";
 

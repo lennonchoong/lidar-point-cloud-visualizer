@@ -5,6 +5,7 @@ import { LASBatch } from "./loader";
 import { LASHeaders } from "./types";
 import { geometry, material, renderer } from "./globals";
 import Octree from "./octree";
+import Socket from "./socket";
 
 declare global {
     interface Window {
@@ -108,9 +109,54 @@ export function loadPoints(header: LASHeaders, batcher: LASBatch[]) {
     animate();
 }
 
+function loadPoints2(points: number[][], header: LASHeaders) {
+    const vertices = [];
+    const colors = [];
+    let maxIntensity = -Infinity;
+
+    for (let point of points) {
+        for (let i = 0; i < point.length; i += 7) {
+            vertices.push(
+                point[i], 
+                point[i + 1],
+                point[i + 2],
+            )
+
+            colors.push(
+                point[i + 3],
+                point[i + 4],
+                point[i + 5],
+                point[i + 6],
+            )
+
+            maxIntensity = Math.max(maxIntensity, point[i + 6])
+        }
+    }
+
+    for (let i = 3; i < colors.length; i += 4) {
+        colors[i] /= maxIntensity;
+    }
+
+    geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(vertices, 3)
+    );
+
+    geometry.setAttribute(
+        "colors",
+        new THREE.Float32BufferAttribute(colors, 4)
+    );
+
+    positionCamera(header);
+
+    scene.add(new THREE.Points(geometry, material));
+
+    animate();
+}
+
 function positionCamera(header: LASHeaders) {
-    const [maxX, maxY, maxZ] = header.maximumBounds;
-    const [minX, minY, minZ] = header.minimumBounds;
+    const [maxX, maxY, maxZ] = header.MaximumBounds;
+    const [minX, minY, minZ] = header.MinimumBounds;
     const [distX, distY, distZ] = [maxX - minX, maxY - minY, maxZ - minZ];
     camera.position.set(0, 2 * distZ, -100);
     // camera.lookAt(new THREE.Vector3(0, maxY - minY, 0));
@@ -140,34 +186,6 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 
 glRenderer?.appendChild(renderer.domElement);
 
-let socket = new WebSocket("ws://localhost:8080/ws");
-
-socket.onopen = (event) => {
-    console.log(event)
-    socket.send("hello world");
-}
-
-socket.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    console.log(data);
-    if (data["Event"] === "sessionId") {
-        window['sessionId'] = data["SessionId"]
-    }
-}
-
-socket.onerror = (event) => {
-    console.log(event);
-}
-
-socket.onclose = () => {
-    let intervalId = setInterval(() => {
-        try {
-            socket = new WebSocket("ws://localhost:8080/ws");
-            clearInterval(intervalId)
-        } catch (error) {
-            console.log(error)
-        }
-    }, 1000)
-}
+new Socket("ws://localhost:8080/ws").connect(loadPoints2)
 
 export {};

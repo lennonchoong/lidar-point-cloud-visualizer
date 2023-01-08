@@ -2,11 +2,14 @@ package main
 
 import (
 	"strconv"
+	"sync"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
+
+	"lidar/structs"
 	// "lidar/octree"
 	"lidar/loader"
 	// "log"
@@ -20,7 +23,7 @@ type SessionIdEvent struct {
 }
 
 func main() {
-	socketMapping := make(map[string]*websocket.Conn)
+	socketMapping := make(map[string]*structs.ConcurrentSocket)
 
 	r := gin.Default()
 
@@ -32,16 +35,19 @@ func main() {
         AllowCredentials: true,
     }))
 
-	userFiles := make(map[string][]*loader.FilePart)
+	userFiles := make(map[string][]*structs.FilePart)
 
 	r.GET("/ws", func(c *gin.Context) {
-		ws, err := websocket.Upgrade(c.Writer, c.Request, nil, 5120, 5120);
+		ws, err := websocket.Upgrade(c.Writer, c.Request, nil, 10240, 10240);
 		if err != nil {
 			fmt.Println(err)
 		}
 
 		sessionId := uuid.NewString()
-		socketMapping[sessionId] = ws;
+		socketMapping[sessionId] = &structs.ConcurrentSocket{
+			Conn: ws,
+			Lock: sync.Mutex{},
+		};
 
 		err = ws.WriteJSON(SessionIdEvent{
 			Event: "sessionId",
@@ -60,7 +66,7 @@ func main() {
 		chunkNumber, _ := strconv.Atoi(c.Request.Header.Get("Uploader-Chunk-Number"))
 		totalChunks, _ := strconv.Atoi(c.Request.Header.Get("Uploader-Chunks-Total"))
 		sessionId := c.Request.Header.Get("Sessionid")
-		filePart := loader.FilePart{
+		filePart := structs.FilePart{
 			File: uploadFile,
 			UploaderId: uploaderId,
 			ChunkNumber: chunkNumber,
@@ -71,7 +77,7 @@ func main() {
 
 		if !exists {
 			fmt.Println(c.Request.Header)
-			userFiles[uploaderId] = []*loader.FilePart{}
+			userFiles[uploaderId] = []*structs.FilePart{}
 		}
 
 		userFiles[uploaderId] = append(userFiles[uploaderId], &filePart)

@@ -25,24 +25,24 @@ export const handleFile = (
         console.log("done");
     });
 
-    const fr = new FileReader();
+    // const fr = new FileReader();
 
-    const batcher: LASBatch[] = [];
+    // const batcher: LASBatch[] = [];
 
-    fr.onload = async () => {
-        console.time('points')
-        const fileBuffer = fr.result;
-        if (fileBuffer && typeof fileBuffer !== "string") {
-            loader.loadFile(fileBuffer);
-            const header = loader.getHeaders();
-            console.log(header);
-            await readLASFileInBatches(loader, header, batcher);
-            callback(header, batcher);
-        }
-    };
+    // fr.onload = async () => {
+    //     console.time('points')
+    //     const fileBuffer = fr.result;
+    //     if (fileBuffer && typeof fileBuffer !== "string") {
+    //         loader.loadFile(fileBuffer);
+    //         const header = loader.getHeaders();
+    //         console.log(header);
+    //         await readLASFileInBatches(loader, header, batcher);
+    //         // callback(header, batcher);
+    //     }
+    // };
 
     // console.log(currentTarget.files[0].size)
-    fr.readAsArrayBuffer(currentTarget.files[0]);
+    // fr.readAsArrayBuffer(currentTarget.files[0]);
 };
 
 const readLASFileInBatches = (

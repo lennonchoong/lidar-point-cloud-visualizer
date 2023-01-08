@@ -1,24 +1,25 @@
 export interface LASHeaders {
-    pointOffset: number;
-    formatID: number;
-    structSize: number;
-    pointCount: number;
-    scale: number[];
-    offset: number[];
-    maximumBounds: number[];
-    minimumBounds: number[];
+    Event: string,
+    PointOffset: number,
+    FormatId: number, 
+    StructSize: number, 
+    PointCount: number, 
+    Scale: number[], 
+    Offset: number[],
+    MinimumBounds: number[],
+    MaximumBounds: number[],
 }
 
-export const dummyLASHeader: LASHeaders = {
-    pointOffset: 0,
-    formatID: 0, 
-    structSize: 0,
-    pointCount: 0,
-    scale: [],
-    offset: [],
-    maximumBounds: [],
-    minimumBounds: []
-}
+// export const dummyLASHeader: LASHeaders = {
+//     pointOffset: 0,
+//     formatID: 0, 
+//     structSize: 0,
+//     pointCount: 0,
+//     scale: [],
+//     offset: [],
+//     maximumBounds: [],
+//     minimumBounds: []
+// }
 
 export interface PointFormat {
     position: number[];

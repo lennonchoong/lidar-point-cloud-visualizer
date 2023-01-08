@@ -1,5 +1,4 @@
 import {
-    dummyLASHeader,
     LASHeaders,
     NumberArrayTypes,
     PointFormat,
@@ -9,13 +8,13 @@ import { pointFormatReaders } from "./utils";
 
 export class LASLoader {
     private buffer: ArrayBuffer;
-    private header: LASHeaders;
+    private header: LASHeaders | null;
     private readOffset: number;
     public version: number;
 
     constructor() {
         this.buffer = new ArrayBuffer(0);
-        this.header = dummyLASHeader;
+        this.header = null;
         this.readOffset = this.version = 0;
     }
 
