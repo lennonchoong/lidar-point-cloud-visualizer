@@ -1,4 +1,5 @@
-import { LASHeaders } from './types';
+import { LASHeaders } from './my_types';
+import { hideProgressBar, showProgressBar, updateProgressBar } from './ui';
 
 class Socket {
     private ws: WebSocket | undefined = undefined; 
@@ -6,6 +7,7 @@ class Socket {
     private url: string | undefined;
     private header: LASHeaders | undefined;
     private chunks: number[][];
+    private chunkCount: number = 0;
 
     constructor(url: string) {
         this.ws = new WebSocket(url);
@@ -29,13 +31,11 @@ class Socket {
             if (data["Event"] === "sessionId") {
                 window['sessionId'] = data["SessionId"]
             } else if (data["Event"] === "points") {
-                o.chunks.push(data["Points"]);
-                if (o.chunks.length === data["TotalChunks"] && o.header) {
-                    console.log("CHUNKS DONE")
-                    callback(o.chunks, o.header)
-                }
+                o.pointEventHandler(data);
             } else if (data["Event"] === "headers") {
                 o.header = data;
+            } else if (data["Event"] === "done") {
+                o.doneEventHandler(callback);
             }
         };
     
@@ -51,10 +51,37 @@ class Socket {
             }, 1000);
         };
     
-        socket.onerror = (err) => {
-            console.log(err);
+        socket.onerror = () => {
             socket.close();
         };
+    }
+
+    pointEventHandler(data: any) {
+        if (!this.chunks.length) {
+            showProgressBar();
+        }
+        
+        this.chunks.push(data["Points"]);
+        
+        this.chunkCount++;
+        
+        const downloadProg = Math.ceil(this.chunkCount / data["TotalChunks"] * 100)
+        updateProgressBar(downloadProg, `Processing... (${downloadProg}%)`)
+    }
+
+    doneEventHandler(callback: (points: number[][], header: LASHeaders) => void) {
+        if (this.header) {
+            console.log("CHUNKS DONE")
+            callback(this.chunks, this.header)
+            hideProgressBar();
+            this.clearPointData();
+        }
+    }
+
+    clearPointData() {
+        this.chunks = [];
+        this.header = undefined;
+        this.chunkCount = 0;
     }
 }
 

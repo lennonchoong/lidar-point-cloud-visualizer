@@ -9,11 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 
-	"lidar/structs"
-	// "lidar/octree"
-	"lidar/loader"
-	// "log"
 	"fmt"
+	"lidar/loader"
+	"lidar/structs"
 	"net/http"
 )
 
@@ -38,7 +36,7 @@ func main() {
 	userFiles := make(map[string][]*structs.FilePart)
 
 	r.GET("/ws", func(c *gin.Context) {
-		ws, err := websocket.Upgrade(c.Writer, c.Request, nil, 10240, 10240);
+		ws, err := websocket.Upgrade(c.Writer, c.Request, nil, 1024 * 32, 1024 * 32);
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -61,7 +59,6 @@ func main() {
 
 	r.POST("/upload", func(c *gin.Context) {
 		uploadFile, _ := c.FormFile("file")
-
 		uploaderId := c.Request.Header.Get("Uploader-File-Id")
 		chunkNumber, _ := strconv.Atoi(c.Request.Header.Get("Uploader-Chunk-Number"))
 		totalChunks, _ := strconv.Atoi(c.Request.Header.Get("Uploader-Chunks-Total"))
@@ -83,7 +80,11 @@ func main() {
 		userFiles[uploaderId] = append(userFiles[uploaderId], &filePart)
 
 		if (len(userFiles[uploaderId]) == totalChunks) {
-			go loader.ProcessFileParts(userFiles[uploaderId], socketMapping[sessionId])
+			go loader.ProcessFileParts(
+				uploaderId,
+				&userFiles, 
+				socketMapping[sessionId], 
+			)
 		}
 		c.String(http.StatusOK, "Data received");
 	})

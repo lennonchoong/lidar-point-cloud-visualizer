@@ -1,5 +1,4 @@
 import kMeansClustering from "./kmeans";
-import { gcd } from "./utils";
 
 class Octree {
     granularity = 1;
