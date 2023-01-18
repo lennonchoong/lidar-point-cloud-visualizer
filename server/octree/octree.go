@@ -109,7 +109,7 @@ func AddPoint(x, y, z, r, g, b, alpha float64, depth, granularity int, node *Oct
 
 		if (!node.Active) {
 			tree.Mutex.Lock()
-			node.Active = true; // Needs another mutex
+			node.Active = true;
 			tree.Leaves = append(tree.Leaves, node)
 			tree.Mutex.Unlock()
 		}

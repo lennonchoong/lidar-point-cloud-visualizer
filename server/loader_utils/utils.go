@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"lidar/structs"
 	"log"
 	"mime/multipart"
 	"time"
-	"lidar/structs"
+
+	"github.com/puzpuzpuz/xsync"
 )
 
 const (
@@ -110,6 +112,17 @@ func ReadFloat64Multiple(buf []byte, offset int64, repeat int) []float64 {
 func TimeTrack(start time.Time, name string) {
     elapsed := time.Since(start)
     log.Printf("%s took %s", name, elapsed)
+}
+
+func TimeTrackMap(start time.Time, name string, mapping *xsync.Map) {
+    elapsed := time.Since(start)
+
+	val, ok := (*mapping).Load(name)
+	if ok {
+		(*mapping).Store(name, elapsed.Milliseconds() + val.(int64))
+	} else {
+		(*mapping).Store(name, int64(0))
+	}
 }
 
 func MinInt64(a int64, b int64) int64 {

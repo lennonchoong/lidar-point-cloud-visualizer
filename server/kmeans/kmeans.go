@@ -1,15 +1,21 @@
 package kmeans
 
 import (
-	"fmt"
+	// "fmt"
 	"math"
 	"sync"
 
+	utils "lidar/loader_utils"
+	"time"
+
+	"github.com/puzpuzpuz/xsync"
 	"golang.org/x/exp/rand"
 )
 
 var pointOffset int = 7
-var maxIterations int = 25
+var maxIterations int = 10
+
+var GlobalTimetracker = xsync.NewMap()
 
 type ClusterLabels struct {
 	points []float64
@@ -42,6 +48,8 @@ func generateKRandNums(min, max, k int, arr *[]int) {
 }
 
 func getRandomCentroids(points []float64, k int) []float64 {
+	defer utils.TimeTrackMap(time.Now(), "getRandomCentroids", GlobalTimetracker)
+
 	numSamples := len(points) / pointOffset;
 	centroidIndexes := []int{}
 	generateKRandNums(0, numSamples, k, &centroidIndexes)
@@ -57,6 +65,8 @@ func getRandomCentroids(points []float64, k int) []float64 {
 } 
 
 func shouldStop(oldCentroids, centroids []float64, iterations int) bool {
+	defer utils.TimeTrackMap(time.Now(), "shouldStop", GlobalTimetracker)
+
 	if iterations > maxIterations {
 		return true
 	}
@@ -84,6 +94,7 @@ func getDistanceSquared(x1, y1, z1, x2, y2, z2 float64) float64 {
 }
 
 func getLabels(points, centroids []float64) map[int]*ClusterLabels {
+	defer utils.TimeTrackMap(time.Now(), "getLabels", GlobalTimetracker)
 	labels := make(map[int]*ClusterLabels)
 
 	for i := 0; i < len(centroids); i += pointOffset {
@@ -117,6 +128,8 @@ func getLabels(points, centroids []float64) map[int]*ClusterLabels {
 }
 
 func getPointsMean(points []float64) []float64 {
+	defer utils.TimeTrackMap(time.Now(), "getPointsMean", GlobalTimetracker)
+
 	totalPoints := float64(len(points) / pointOffset);
 	means := []float64{0, 0, 0, 0, 0, 0, 0}
 
@@ -134,30 +147,33 @@ func getPointsMean(points []float64) []float64 {
 }
 
 func recalculateCentroids(points []float64, labels map[int]*ClusterLabels) []float64 {
-	newCentroid := []float64{};
+	defer utils.TimeTrackMap(time.Now(), "recalculateCentroids", GlobalTimetracker)
 	newCentroidList := []float64{};
-
+	newCentroid := []float64{}
 	for _, group := range labels {
 		if len(group.points) > 0 {
 			newCentroid = getPointsMean(group.points);
 		} else {
 			newCentroid = getRandomCentroids(points, 1)[:pointOffset];
 		}
-		newCentroidList = append(newCentroidList, newCentroid...)
+
+		newCentroidList = append(newCentroidList, newCentroid...);
 	}
+
 	return newCentroidList
 }
 
 func kMeansHelper(points []float64, k int) *ClusterResult {
+	defer utils.TimeTrackMap(time.Now(), "kMeansHelper", GlobalTimetracker)
 	if len(points) != 0 && len(points) > k {
 		iterations := 0;
 		labels := make(map[int]*ClusterLabels)
 		centroids := getRandomCentroids(points, k)
 		oldCentroids := make([]float64, k * pointOffset)
 		for !shouldStop(oldCentroids, centroids, iterations) {
-			copy(oldCentroids, centroids)
 			iterations++;
 			labels = getLabels(points, centroids);
+			oldCentroids = centroids
 			centroids = recalculateCentroids(points, labels);
 		}
 
@@ -176,22 +192,24 @@ func kMeansHelper(points []float64, k int) *ClusterResult {
 }
 
 func elbowCostFunction(labels map[int]*ClusterLabels) float64 {
+	defer utils.TimeTrackMap(time.Now(), "elbowCostFunction", GlobalTimetracker)
+
 	cost := 0.0
 	for _, label := range labels {
 		centroidX, centroidY, centroidZ := label.centroids[0], label.centroids[1], label.centroids[2]
 		points := label.points
 
 		for i := 0; i < len(points); i += pointOffset {
-			diffX, diffY, diffZ := centroidX - points[i], centroidY - points[i + 1], centroidZ - points[i + 2]
-			cost += diffX * diffX + diffY * diffY + diffZ * diffZ
+			cost += getDistanceSquared(centroidX, centroidY, centroidZ, points[i], points[i + 1], points[i + 2])
 		}
 	}
 
 	return cost
 }
 
-func elbowMethod(points []float64) *ClusterResult{
-	// mapping := make(map[int]*ClusterResult);
+func elbowMethod(points []float64) *ClusterResult {
+	defer utils.TimeTrackMap(time.Now(), "elbowMethod", GlobalTimetracker)
+
 	n := len(points) / pointOffset;
 	maxJ := math.Inf(-1)
 	maxJIndex := 1;
@@ -201,7 +219,8 @@ func elbowMethod(points []float64) *ClusterResult{
 
 	wg := sync.WaitGroup{}
 
-	for i := 1; i <= n / 2; i++ {
+	j := 0
+	for i := 1; i <= n / 2; i += 3 {
 		wg.Add(1)
 		go func(i int) {
 			clusteringResult := kMeansHelper(points, i);
@@ -209,14 +228,15 @@ func elbowMethod(points []float64) *ClusterResult{
 			d[i] = clusteringResult.cost
 			wg.Done()
 		}(i)
+		j++;
 	}
 
 	wg.Wait()
 
-	for i := 0; i < n / 2 - 1; i++ {
-		if d[i] - d[i + 1] > maxJ {
-			maxJ = d[i] - d[i + 1]
-			maxJIndex = i + 1;
+	for i := 0; i < len(d) - 1; i += 3 {
+		if i + 4 < len(d) && math.Abs(d[i] - d[i + 1 + 3]) > maxJ {
+			maxJ = math.Abs(d[i] - d[i + 1 + 3])
+			maxJIndex = i + 1 + 3;
 		}
 	}
 
@@ -234,75 +254,85 @@ func optimizedElbowMethod(points []float64) *ClusterResult{
 		}
 	}
 
-	d := n / 2
+	d := n / 2 + 1
 	clusters := make([]*ClusterResult, d)
 	diff := make([]float64, d);
 	diff[0] = 0.0
-	l, r := 1, d - 1
-	mid := l + (r - l) / 2
+	l, r := 1, len(diff)
 
-	fmt.Println("D=", d, ", mid=", mid)
+	if l >= r {
+		return kMeansHelper(points, l)
+	}
 
-	clusters[mid] = kMeansHelper(points, mid)
-	clusters[mid + 1] = kMeansHelper(points, mid + 1)
-	diff[mid] = math.Abs(clusters[mid].cost - clusters[mid + 1].cost)
+	for l < r {
+		mid := l + (r - l) / 2
 
-	// for l < r {
-	// 	mid := l + (r - l) / 2
+		if mid > 1 && mid < d && diff[mid] == 0 {
+			if clusters[mid - 1] == nil {
+				clusters[mid - 1] = kMeansHelper(points, mid - 1)
+			}
+			if clusters[mid] == nil {
+				clusters[mid] = kMeansHelper(points, mid)
+			}
 
-	// 	if diff[mid] == 0 {
-	// 		if clusters[mid] == nil {
-	// 			clusters[mid] = kMeansHelper(points, mid)
-	// 		}
-	// 		if clusters[mid + 1] == nil {
-	// 			clusters[mid + 1] = kMeansHelper(points, mid + 1)
-	// 		}
+			diff[mid] = math.Abs(clusters[mid - 1].cost - clusters[mid].cost)
+		}
 
-	// 		diff[mid] = math.Abs(clusters[mid].cost - clusters[mid + 1].cost)
-	// 	}
+		if mid > 3 && mid - 1 < d && diff[mid - 1] == 0 {
+			if clusters[mid - 2] == nil {
+				clusters[mid - 2] = kMeansHelper(points, mid - 2)
+			}
+			if clusters[mid - 1] == nil {
+				clusters[mid - 1] = kMeansHelper(points, mid - 1)
+			}
 
-	// 	if mid > 0 && diff[mid - 1] == 0 {
-	// 		fmt.Println("CLUSTERS [mid - 1]", clusters[mid - 1])
-	// 		if clusters[mid - 1] == nil {
-	// 			clusters[mid - 1] = kMeansHelper(points, mid - 1)
-	// 		}
-	// 		if clusters[mid] == nil {
-	// 			clusters[mid] = kMeansHelper(points, mid)
-	// 		}
+			diff[mid - 1] = math.Abs(clusters[mid - 2].cost - clusters[mid - 1].cost)
+		}
 
-	// 		diff[mid - 1] = math.Abs(clusters[mid - 1].cost - clusters[mid].cost)
-	// 	}
+		if mid + 1 < d && mid > 0 && diff[mid + 1] == 0 {
+			if clusters[mid + 1] == nil {
+				clusters[mid + 1] = kMeansHelper(points, mid + 1)
+			}
+			if clusters[mid] == nil {
+				clusters[mid] = kMeansHelper(points, mid)
+			}
 
-	// 	if mid < d - 1 && diff[mid + 1] == 0 {
-	// 		if clusters[mid + 1] == nil {
-	// 			clusters[mid + 1] = kMeansHelper(points, mid + 1)
-	// 		}
-	// 		if clusters[mid + 2] == nil {
-	// 			clusters[mid + 2] = kMeansHelper(points, mid + 2)
-	// 		}
+			diff[mid + 1] = math.Abs(clusters[mid + 1].cost - clusters[mid].cost)
+		}
 
-	// 		diff[mid + 1] = math.Abs(clusters[mid + 1].cost - clusters[mid + 2].cost)
-	// 	}
+		if (mid > 0 && diff[mid - 1] < diff[mid]) &&
+		(mid < d - 1 && diff[mid] > diff[mid + 1]) {
+			return clusters[mid]
+		} else if (
+			mid > 0 && mid < d - 1 && 
+			diff[mid - 1] >= diff[mid] &&
+			diff[mid] >= diff[mid + 1]) {
+			r = mid - 1
+		} else {
+			l = mid + 1
+		}
+	}
+	
+	// last := int(math.Min(float64(r), float64(len(clusters) - 1)))
 
-
-	// 	if (mid == 0 || diff[mid - 1] <= diff[mid]) &&
-	// 	(mid == d - 2 || diff[mid] >= diff[mid + 1]){
-	// 		return clusters[mid]
-	// 	} else if (mid > 0 && diff[mid - 1] > diff[mid]) {
-	// 		r = mid - 1
-	// 	} else {
-	// 		l = mid + 1
-	// 	}
+	// if clusters[d] == nil {
+	// 	clusters[d] = 
 	// }
-	return clusters[mid]
+
+	return kMeansHelper(points, d)
 }
+
+// func stochasticElbowMethod(points []float64) *ClusterResult {
+
+// }
 
 func KMeansClustering(points []float64) []float64 {
 	if (len(points) <= pointOffset) {
 		return points;
 	}
-	return optimizedElbowMethod(points).centroids;
+	// res := optimizedElbowMethod(points).centroids;
 
-	// return elbowMethod(points).centroids;
+	// return res
+	return elbowMethod(points).centroids;
 	// return kMeansHelper(points, 2).centroids
 }

@@ -12,6 +12,7 @@ import (
 
 	// "io"
 	"lidar/constants"
+	"lidar/kmeans"
 	utils "lidar/loader_utils"
 	"lidar/octree"
 	"lidar/structs"
@@ -323,18 +324,25 @@ func ProcessFileParts(
 
 	octree.ClusterPoints(socket, &o.Leaves, metadata, &clusteringWg);
 
+	clusteringWg.Wait()
+
 	fmt.Println("DONE CLUSTERING")
 
-	clusteringWg.Wait()
+	kmeans.GlobalTimetracker.Range(func(key string, value interface{}) bool {
+		fmt.Println(key, value);
+		return true
+
+	});
+
 
 	sendingWg := sync.WaitGroup{}
 
 	sendClusteredPoints(socket, o, &sendingWg)
 
-	fmt.Println("DONE SENDING CLUSTERED CHUNKS")
-
 	sendingWg.Wait()
 	
+	fmt.Println("DONE SENDING CLUSTERED CHUNKS")
+
 	sendDone(socket);
 
 	delete((*filePartMapping), uploaderId)
