@@ -84,10 +84,20 @@ func main() {
 				uploaderId,
 				&userFiles, 
 				socketMapping[sessionId], 
+				&structs.ProcessingOptions{
+					Clustering: c.Request.Header.Get("Clustering"),
+					Subsample: c.Request.Header.Get("Subsample"),
+					Lod: c.Request.Header.Get("Lod"),
+					Density: c.Request.Header.Get("Density"),
+				},
 			)
 		}
 		c.String(http.StatusOK, "Data received");
 	})
+
+	r.StaticFile("/test", "./test.txt")
+
+	r.StaticFile("/test2", "./test2.txt")
 
 	r.Run() // listen and serve on 0.0.0.0:8080
 }

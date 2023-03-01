@@ -18,14 +18,39 @@ type ConcurrentCounter struct {
 	Wg sync.WaitGroup
 }
 
+type ProcessingOptions struct {
+	Clustering string
+	Subsample string
+	Lod string
+	Density string
+}
+
 type PointChunk struct {
 	Event string
 	Points []float64
 	TotalChunks int
 }
 
+type FileReadyEvent struct {
+	Event string
+	FilePath string
+}
+
+type LODChunk struct {
+	Event string
+	Points []float64
+	TotalChunks int
+	RenderDistance float64
+	Label string
+}
+
 type DoneEvent struct {
 	Event string
+}
+
+type ProgressEvent struct {
+	Event string
+	Message string
 }
 
 type LASMetaData struct {

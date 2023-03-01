@@ -185,6 +185,17 @@ func DetermineColor(color uint16, classification uint8, idx int) float64 {
 	return 1.0;
 }
 
+func SendProgress(message string, socket *structs.ConcurrentSocket) {
+	go func() {
+		socket.Lock.Lock()
+		defer socket.Lock.Unlock()
+		socket.Conn.WriteJSON(structs.ProgressEvent{
+			Event: "progress",
+			Message: message,
+		})
+	}()
+}
+
 var ColorClassifications [][3]float64 = [][3]float64{
 	{0, 0, 0},
 	{0, 0, 0},

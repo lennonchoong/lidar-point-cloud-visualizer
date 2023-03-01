@@ -5,6 +5,7 @@ import {
     PointFormatReader,
 } from "./my_types";
 // import { updateProgressBar, hideProgressBar } from "./ui";
+import defaultOptions from "./options";
 import HugeUploader from "huge-uploader";
 import { hideProgressBar, showProgressBar, updateProgressBar } from "./ui";
 
@@ -21,6 +22,10 @@ export const handleFile = (e: Event) => {
         chunkSize: 10,
         headers: {
             sessionId: window.sessionId,
+            clustering: defaultOptions.clustering,
+            subsample: defaultOptions.subsample,
+            lod: defaultOptions.lod,
+            density: defaultOptions.density,
         },
     });
 
@@ -36,16 +41,21 @@ export const handleFile = (e: Event) => {
 export const cleanUp = () => {
     console.log("CLEANING UP");
 
-    if (window["geometry"]) {
-        window["geometry"].dispose();
+    if (window["geometry"] && window["geometry"].length) {
+        window["geometry"].forEach(g => g.dispose());
     } 
 
-    if (window["material"]) {
-        window["material"].dispose();
+    if (window["material"] && window["geometry"].length) {
+        window["material"].forEach(m => m.dispose());
     } 
 
     if (window["renderer"]) {
         window["renderer"].clear();   
+    }
+
+    if (window["lod"]) {
+        window["scene"].remove(window["lod"])
+        window["lod"].clear()
     }
 };
 

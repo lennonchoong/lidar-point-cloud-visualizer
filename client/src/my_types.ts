@@ -1,18 +1,18 @@
 export interface LASHeaders {
-    Event: string,
-    PointOffset: number,
-    FormatId: number, 
-    StructSize: number, 
-    PointCount: number, 
-    Scale: number[], 
-    Offset: number[],
-    MinimumBounds: number[],
-    MaximumBounds: number[],
+    Event: string;
+    PointOffset: number;
+    FormatId: number;
+    StructSize: number;
+    PointCount: number;
+    Scale: number[];
+    Offset: number[];
+    MinimumBounds: number[];
+    MaximumBounds: number[];
 }
 
 // export const dummyLASHeader: LASHeaders = {
 //     pointOffset: 0,
-//     formatID: 0, 
+//     formatID: 0,
 //     structSize: 0,
 //     pointCount: 0,
 //     scale: [],
@@ -36,7 +36,7 @@ export type NumberArrayTypes =
     | Uint32ArrayConstructor
     | Float64ArrayConstructor;
 
-export const colorClassifications: { [key: number] : number[] } = {
+export const colorClassifications: { [key: number]: number[] } = {
     2: [161, 82, 46], // ground
     3: [0, 255, 1], // low vegetation
     4: [0, 204, 0], // medium vegetation
@@ -52,4 +52,69 @@ export const colorClassifications: { [key: number] : number[] } = {
     16: [255, 255, 0], // wire - connector
     17: [255, 255, 0], // bridge deck
     18: [255, 255, 0], // high noise
+};
+
+export type Camera = THREE.PerspectiveCamera | THREE.OrthographicCamera;
+
+export interface SphereMarker {
+    mesh: THREE.Mesh;
+    x: number;
+    y: number;
+    z: number;
 }
+
+export enum Tools {
+    Point = "point-measure",
+    Distance = "distance-measure",
+    Area = "area-measure",
+    Height = "height-measure",
+    Angle = "angle-measure",
+}
+
+export interface Annotation {
+    element: HTMLDivElement;
+    x: number;
+    y: number;
+    yAdjusted: number;
+    z: number;
+    heightOffset: number;
+    type: Tools;
+}
+
+export interface PointMarker {
+    annotation: Annotation;
+    point: THREE.Mesh;
+}
+
+export interface DistanceMarker {
+    annotation: Annotation;
+    point1: THREE.Mesh;
+    point2: THREE.Mesh;
+    line: THREE.Line;
+}
+
+export interface AngleMarker {
+    annotations: Annotation[];
+    point1: THREE.Mesh; 
+    point2: THREE.Mesh;
+    point3: THREE.Mesh;
+    line1: THREE.Line;
+    line2: THREE.Line;
+    line3: THREE.Line;
+}
+
+export function isPointMarker(s: MarkerGroup): s is PointMarker {
+    return (s as PointMarker).point !== undefined
+}
+
+export function isDistanceMarker(s: MarkerGroup): s is DistanceMarker {
+    const casted = (s as DistanceMarker)
+    return casted.point1 !== undefined && casted.point2 !== undefined && casted.line !== undefined
+}
+
+export function isAngleMarker(s: MarkerGroup): s is AngleMarker {
+    const casted = (s as AngleMarker)
+    return casted.annotations !== undefined
+}
+
+export type MarkerGroup = PointMarker | DistanceMarker | AngleMarker

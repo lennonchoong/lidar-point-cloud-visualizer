@@ -8,11 +8,11 @@
     </head>
     <body>
         <div id="app">
+            <div id="slider-tooltip"></div>
             <div id="gl-container"></div>
-
             <div id="options-panel">
                 <div id="options-label">
-                    <div id="options-text">Hide</div>
+                    <div id="options-text">Settings</div>
                     <svg
                         width="24px"
                         height="24px"
@@ -33,9 +33,89 @@
                     </svg>
                 </div>
                 <div id="options-body">
-                    <div id="input-container">
-                        <input id="file-input" type="file" />
+                    <div class="options-subwrapper">
+                        <div class='subwrapper-label'>File Upload</div>
+                        <div id="input-container">
+                            <input id="file-input" type="file" />
+                        </div>    
                     </div>
+                    <div class="options-subwrapper">
+                        <div class='subwrapper-label'>Optimisation Options</div>
+                        <div class="checkbox-wrapper">
+                            <label for="clustering">Point Clustering:</label>
+                            <input type="checkbox" name="" id="clustering">
+                        </div>
+                        <div class="checkbox-wrapper">
+                            <label for="lod">Dynamic Level-Of-Detail:</label>
+                            <input type="checkbox" name="" id="lod">
+                        </div>
+                        <div class="checkbox-wrapper">
+                            <label for="subsample">Point Subsampling:</label>
+                            <input type="checkbox" name="" id="subsample">
+                        </div>
+                        <div class="checkbox-wrapper">
+                            <label for="density">Point Density:</label>
+                            <input type="range" name="" id="density" min="0" max="100" value="100">
+                        </div>
+                    </div>
+                    <div class="options-subwrapper">
+                        <div class='subwrapper-label'>Rendering Options</div>
+                        <div class="checkbox-wrapper">
+                            <label for="point-size">Point Size:</label>
+                            <input type="range" name="" min='50' max='500' value='200' id="point-size">
+                        </div>
+                        <div class="checkbox-wrapper">
+                            <label for="z-exaggeration">Z-Exaggeration:</label>
+                            <input type="range" name="" min='0' max='100' value='0' id="z-exaggeration">
+                        </div>
+                        <div class="checkbox-wrapper">
+                            <label for="clustering">Classification Colours:</label>
+                            <input type="checkbox" name="" id="clustering">
+                        </div>
+                    </div>
+                    <div class="options-subwrapper">
+                        <div class='subwrapper-label'>Camera Options</div>
+                        <div class="checkbox-wrapper column">
+                            <label for="density">Type:</label>
+                            <div>
+                                <button id="perspective-camera" class="active-button" value="1">
+                                    Perspective
+                                </button>
+                                <button id="orthogonal-camera" value="2">
+                                    Orthogonal
+                                </button>
+                                <button id="top-view-camera" value="3">
+                                    Top-View
+                                </button>    
+                            </div>
+                        </div>
+                        <div class="checkbox-wrapper">
+                            <label for="camera-fov">Field Of View:</label>
+                            <input type="range" name="" min="30" max="120" value="75" id="camera-fov">
+                        </div>
+                        <div class="button-wrapper">
+                            <button id="reset-camera">
+                                Reset Camera
+                            </button>
+                        </div>
+                    </div>
+                    <div class="options-subwrapper">
+                        <div class="subwrapper-label">Optimised File Download</div>
+                        <a id='file-downloader' href="" download></a>
+                        <button id="file-download-btn" disabled>
+                            No file uploaded
+                        </button>
+                    </div>
+                    <div class="options-subwrapper">
+                        <div class="subwrapper-label">Tools</div>
+                        <button id="point-measure">Point</button>
+                        <button id="distance-measure">Distance</button>
+                        <button id="height-measure">Height</button>
+                        <button id="area-measure">Area</button>
+                        <button id="angle-measure">Angle</button>
+                        <button id="clear-tools">Clear</button>
+                    </div>
+                    <div id="footer"></div>
                 </div>
             </div>
 
@@ -48,5 +128,7 @@
         </div>
         <script type="module" src="/src/main.ts"></script>
         <script type="module" src="/src/ui.ts"></script>
+        <script type="module" src="/src/options.ts"></script>
+        <script type="module" src="/src/tools.ts"></script>
     </body>
 </html>

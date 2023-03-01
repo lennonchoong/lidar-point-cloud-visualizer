@@ -1,0 +1,1 @@
+{"Event":"headers","PointOffset":489,"FormatId":1,"StructSize":28,"PointCount":173440,"Scale":[0.01,0.01,0.01],"Offset":[0,0,0],"MaximumBounds":[308320.02,4103252.24,1753.13],"MinimumBounds":[308054.72000000003,4103007.12,1682.78]}

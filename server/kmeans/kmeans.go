@@ -10,6 +10,8 @@ import (
 
 	"github.com/puzpuzpuz/xsync"
 	"golang.org/x/exp/rand"
+	"lidar/kdtree"
+	// "gonum.org/v1/gonum/spatial/kdtree"
 )
 
 var pointOffset int = 7
@@ -216,11 +218,12 @@ func elbowMethod(points []float64) *ClusterResult {
 	d := make([]float64, n / 2 + 1);
 	mapping := make([]*ClusterResult, n / 2 + 1);
 	d[0] = 0.0
+	skip := 3
 
 	wg := sync.WaitGroup{}
 
 	j := 0
-	for i := 1; i <= n / 2; i += 3 {
+	for i := 1; i <= n / 2; i += skip {
 		wg.Add(1)
 		go func(i int) {
 			clusteringResult := kMeansHelper(points, i);
@@ -233,10 +236,10 @@ func elbowMethod(points []float64) *ClusterResult {
 
 	wg.Wait()
 
-	for i := 0; i < len(d) - 1; i += 3 {
-		if i + 4 < len(d) && math.Abs(d[i] - d[i + 1 + 3]) > maxJ {
-			maxJ = math.Abs(d[i] - d[i + 1 + 3])
-			maxJIndex = i + 1 + 3;
+	for i := 0; i < len(d) - 1; i += skip {
+		if i + 1 + skip < len(d) && math.Abs(d[i] - d[i + 1 + skip]) > maxJ {
+			maxJ = math.Abs(d[i] - d[i + 1 + skip])
+			maxJIndex = i + 1 + skip;
 		}
 	}
 
@@ -322,9 +325,88 @@ func optimizedElbowMethod(points []float64) *ClusterResult{
 	return kMeansHelper(points, d)
 }
 
-// func stochasticElbowMethod(points []float64) *ClusterResult {
+func kdElbowCostFunction(centroids, points []float64) float64 {
+	total := 0.0
 
-// }
+	for i := 0; i < len(points); i += pointOffset {
+		curMin := math.MaxFloat64
+
+		for j := 0; j < len(centroids); j += pointOffset {
+			diffX, diffY, diffZ := points[i] - centroids[j], points[i + 1] - centroids[j + 1], points[i + 2] - centroids[j + 2]
+			curMin = math.Min(curMin, diffX * diffX + diffY * diffY + diffZ * diffZ)
+		}
+		total += curMin
+	}
+	return total / float64(len(centroids))
+}
+
+func kdElbowMethod(points []float64) *ClusterResult {
+	defer utils.TimeTrackMap(time.Now(), "kdElbowMethod", GlobalTimetracker)
+	n := len(points) / pointOffset;
+	maxJ := math.Inf(1)
+	maxJIndex := 1;
+	d := make([]float64, n / 2 + 1);
+	mapping := make([]*[]float64, n / 2 + 1);
+	d[0] = 0.0
+	
+	_, tree := kdtree.ConstructTree(points, 0)
+
+	wg := sync.WaitGroup{}
+
+	for i := 1; i <= n / 2; i++ {
+		wg.Add(1)
+		go func(i int) {
+			randomCentroids := getRandomCentroids(points, i)
+			candidateSet := []*kdtree.MeansInstance{}	
+			for i := 0; i < len(randomCentroids); i += pointOffset {
+				candidateSet = append(candidateSet, kdtree.InitMeansInstance(pointOffset, points[i : i + pointOffset]))
+			}
+			tree.CopyTree().Filter(candidateSet)
+			centroids := []float64{}
+			for _, candidate := range candidateSet {
+				centroids = append(centroids, candidate.GetRealPoints()...)
+			}
+
+			labels := getLabels(points, centroids)
+			d[i] = elbowCostFunction(labels)
+			mapping[i] = &centroids
+			wg.Done()
+		}(i)
+	}
+
+	wg.Wait()
+
+	for i := 1; i < len(d); i++ {
+		if d[i] < maxJ {
+			maxJ = d[i]
+			maxJIndex = i 
+		}
+	}
+	
+	return &ClusterResult{
+		nil, 
+		*mapping[maxJIndex],
+		0,
+	}
+}
+
+type Point struct {
+	X []float64
+	Y int
+}
+
+// Dist returns the Euclidean distance between two points
+func (a Point) Dist(b Point) float64 {
+	var sum float64
+	for i := range a.X {
+		sum += (a.X[i] - b.X[i]) * (a.X[i] - b.X[i])
+	}
+	return math.Sqrt(sum)
+}
+
+
+func kdTreeKMeansClustering(points []float64, k int) {
+}
 
 func KMeansClustering(points []float64) []float64 {
 	if (len(points) <= pointOffset) {
@@ -332,7 +414,7 @@ func KMeansClustering(points []float64) []float64 {
 	}
 	// res := optimizedElbowMethod(points).centroids;
 
-	// return res
-	return elbowMethod(points).centroids;
+	return kdElbowMethod(points).centroids;
+	// return elbowMethod(points).centroids;
 	// return kMeansHelper(points, 2).centroids
 }

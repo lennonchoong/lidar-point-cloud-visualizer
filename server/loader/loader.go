@@ -1,19 +1,20 @@
 package loader
 
 import (
-	// "bytes"
-	// "encoding/binary"
 	"fmt"
 	"io"
 	"sort"
 	"sync"
+	"strconv"
 
 	"math"
+	"math/rand"
 
-	// "io"
 	"lidar/constants"
+	"lidar/filewriter"
 	"lidar/kmeans"
 	utils "lidar/loader_utils"
+	"lidar/lod"
 	"lidar/octree"
 	"lidar/structs"
 	"time"
@@ -77,30 +78,55 @@ func sendDone(socket *structs.ConcurrentSocket) {
 	})
 }
 
-func LoadData(socket *structs.ConcurrentSocket, buf []byte, m *structs.LASMetaData, o *octree.Octree, wg *sync.WaitGroup) {
+func coinFlip(density float64) bool {
+	return rand.Float64() <= 0.1 + (density / 100 * 0.6)
+}
+
+func LoadData(socket *structs.ConcurrentSocket, buf []byte, m *structs.LASMetaData, o *octree.Octree, wg *sync.WaitGroup, subsample bool, density float64) {
 	// o.Mutex.Lock()
 	// defer o.Mutex.Unlock()
 	defer wg.Done()
 	var i int64 = 0;
 	bufferLen := int64(len(buf))
 	for i < bufferLen {
-		pointFormatReader(
-			o,
-			buf,
-			i, 
-			m.FormatId, 
-			m.ScaleX, 
-			m.OffsetX, 
-			m.ScaleY, 
-			m.OffsetY, 
-			m.ScaleZ, 
-			m.OffsetZ,
-		);
+		if !subsample || coinFlip(density) {
+			x, z, y, r, g, b, intensity := pointFormatReader(
+				buf,
+				i, 
+				m.FormatId, 
+				m.ScaleX, 
+				m.OffsetX, 
+				m.ScaleY, 
+				m.OffsetY, 
+				m.ScaleZ, 
+				m.OffsetZ,
+			);
+
+			octree.AddPoint(
+				x,
+				z,
+				y,
+				r,
+				g,
+				b,
+				intensity,
+				0,
+				o.Granularity, 
+				o.Root,
+				o,
+			)
+		}
+		
 		i += m.StructSize;
 	}
 }
 
-func pointFormatReader(o *octree.Octree, buffer []byte, offset int64, formatId int32, scaleX, offsetX, scaleY, offsetY, scaleZ, offsetZ float64) {
+func pointFormatReader(
+	buffer []byte, 
+	offset int64, 
+	formatId int32, 
+	scaleX, offsetX, scaleY, offsetY, scaleZ, offsetZ float64,
+) (float64, float64, float64, float64, float64, float64, float64) {
 	var r, g, b uint16;
 	x := utils.ReadInt32Single(buffer, offset + 0);
 	y := utils.ReadInt32Single(buffer, offset + 4);
@@ -118,19 +144,13 @@ func pointFormatReader(o *octree.Octree, buffer []byte, offset int64, formatId i
 		b = utils.ReadUint16Single(buffer, offset + 32)
 	}
 
-	octree.AddPoint(
-		float64(x) * scaleX,
+	return float64(x) * scaleX,
 		float64(z) * scaleZ,
 		float64(y) * scaleY,
 		utils.DetermineColor(r, classification, 0),
 		utils.DetermineColor(g, classification, 1),
 		utils.DetermineColor(b, classification, 2),
-		float64(intensity),
-		0,
-		o.Granularity, 
-		o.Root,
-		o,
-	)
+		float64(intensity)
 }
 
 func getFileMetaData(headers *structs.LASHeaders) *structs.LASMetaData {
@@ -138,8 +158,8 @@ func getFileMetaData(headers *structs.LASHeaders) *structs.LASMetaData {
 	scaleX, scaleY, scaleZ := headers.Scale[0], headers.Scale[1], headers.Scale[2]
 	minX, minY, minZ := headers.MinimumBounds[0], headers.MinimumBounds[1], headers.MinimumBounds[2]
 	maxX, maxY, maxZ := headers.MaximumBounds[0], headers.MaximumBounds[1], headers.MaximumBounds[2]
-	midX, midY := (maxX - minX) / 2, (maxY - minY) / 2
-	offsetX, offsetY, offsetZ := -midX - minX, -midY - minY, -minZ
+	midX, midY, midZ := (maxX - minX) / 2, (maxY - minY) / 2, (maxZ - minZ) / 2
+	offsetX, offsetY, offsetZ := -midX - minX, -midY - minY, -midZ - minZ
 
 	pointsInWindow := utils.MinUInt32(100000, headers.PointCount)
 
@@ -165,19 +185,27 @@ func getFileMetaData(headers *structs.LASHeaders) *structs.LASMetaData {
 	}
 }
 
-func sendClusteredPoints(socket *structs.ConcurrentSocket, o *octree.Octree, wg *sync.WaitGroup) {
+func sendClusteredPoints(socket *structs.ConcurrentSocket, o *octree.Octree, wg *sync.WaitGroup, m *structs.LASMetaData) {
 	defer utils.TimeTrack(time.Now(), "sendClusteredPoints")
 
 	collector := []float64{}
 	pointsAfter := 0
-	for _, leaf := range o.Leaves { // NEED TO WRITE BETTER SLIDING WINDOW ALGO, FORGETTING TAIL END
+	for _, leaf := range o.Leaves {
+		for i := 0; i < len(leaf.Points); i += 7 {
+			leaf.Points[i] = leaf.Points[i] + m.OffsetX
+			leaf.Points[i + 1] = leaf.Points[i + 1] + m.OffsetZ
+			leaf.Points[i + 2] = leaf.Points[i + 2] + m.OffsetY
+		}
+		
 		p := leaf.Points
 		pointsAfter += len(p)
+
 		collector = append(collector, p...)
 	}
 
-
 	i := 0
+
+	totalChunks := math.Ceil(float64(len(collector)) / float64(constants.SocketChunkSize))
 
 	for i + constants.SocketChunkSize < len(collector) {
 		wg.Add(1)
@@ -188,7 +216,7 @@ func sendClusteredPoints(socket *structs.ConcurrentSocket, o *octree.Octree, wg 
 			socket.Conn.WriteJSON(structs.PointChunk{
 				Event: "points",
 				Points: chunk,
-				TotalChunks: 0, 
+				TotalChunks: int(totalChunks), 
 			})
 		}(collector[i : i + constants.SocketChunkSize])
 
@@ -204,7 +232,7 @@ func sendClusteredPoints(socket *structs.ConcurrentSocket, o *octree.Octree, wg 
 			socket.Conn.WriteJSON(structs.PointChunk{
 				Event: "points",
 				Points: chunk,
-				TotalChunks: 0, 
+				TotalChunks: int(totalChunks), 
 			})
 		}(collector[i:])
 	}
@@ -212,14 +240,145 @@ func sendClusteredPoints(socket *structs.ConcurrentSocket, o *octree.Octree, wg 
 	fmt.Println("POINTS AFTER ", pointsAfter / 7)
 }
 
+func readAndSendPointsFromBuffer(socket *structs.ConcurrentSocket, buf []byte, idx int, m structs.LASMetaData, wg2 *sync.WaitGroup, subsample bool, density float64) {
+	var i int64 = 0;
+	bufferLen := int64(len(buf))
+
+	temp := []float64{}
+
+	for i < bufferLen {
+		if !subsample || coinFlip(density) {
+			x, z, y, r, g, b, intensity := pointFormatReader(
+				buf,
+				i, 
+				m.FormatId, 
+				m.ScaleX, 
+				m.OffsetX, 
+				m.ScaleY, 
+				m.OffsetY, 
+				m.ScaleZ, 
+				m.OffsetZ,
+			);
+			temp = append(temp, x + m.OffsetX, z + m.OffsetZ, y + m.OffsetY, r, g, b, intensity)
+		}
+		
+		i += m.StructSize;
+	}
+
+	j := 0
+
+	wg := sync.WaitGroup{}
+
+	for j + constants.SocketChunkSize < len(temp) {
+		wg.Add(1)
+		go func(chunk []float64) {
+			socket.Lock.Lock()
+			defer wg.Done()
+			defer socket.Lock.Unlock()
+			socket.Conn.WriteJSON(structs.PointChunk{
+				Event: "points",
+				Points: chunk,
+				TotalChunks: 0,
+			})
+		}(temp[j : j + constants.SocketChunkSize])
+
+		j += constants.SocketChunkSize
+	}
+
+	if j < len(temp) {
+		wg.Add(1)
+		go func(chunk []float64) {
+			socket.Lock.Lock()
+			defer wg.Done()
+			defer socket.Lock.Unlock()
+			socket.Conn.WriteJSON(structs.PointChunk{
+				Event: "points",
+				Points: chunk,
+				TotalChunks: 0, 
+			})
+		}(temp[j:])
+	}
+	wg.Wait()
+	wg2.Done()
+}
+
+func processWithoutClustering(socket *structs.ConcurrentSocket, parts []*structs.FilePart, headers *structs.LASHeaders, metadata *structs.LASMetaData, subsample bool, density float64) {
+	startBP := int64(headers.PointOffset)
+	windowSize := int64(metadata.PointsInWindow * uint32(headers.StructSize)) // no. of points
+	j := 0
+	wg := sync.WaitGroup{}
+
+	for i := 0; i < len(parts); i++ {
+		startPart := parts[i]
+		fileSize := startPart.File.Size
+		file, _ := startPart.File.Open()
+		file.Seek(startBP, 0)
+
+		for startBP + windowSize < fileSize {
+			chunk := make([]byte, windowSize)
+			file.Read(chunk)
+			wg.Add(1)
+			go readAndSendPointsFromBuffer(socket, chunk, j, *metadata, &wg, subsample, density)
+			j++
+			file.Seek(startBP + windowSize, 0)
+			startBP += windowSize
+		}
+		
+		if startBP == fileSize {
+			startBP = 0
+			defer file.Close()
+			continue
+		}
+
+		if startBP < fileSize && i + 1 < len(parts) {
+			prevSize := fileSize - startBP
+			nextSize := windowSize - prevSize
+
+			nextFile, _ := parts[i + 1].File.Open()
+			nextChunk := make([]byte, nextSize)
+			nextFile.Read(nextChunk)
+
+			file.Seek(startBP, 0)
+			prevChunk := make([]byte, prevSize)
+			file.Read(prevChunk)
+
+			prevChunk = append(prevChunk, nextChunk...)
+			wg.Add(1)
+			go readAndSendPointsFromBuffer(socket, prevChunk, j, *metadata, &wg, subsample, density)
+			j++
+			startBP = nextSize
+
+			defer file.Close()
+			defer nextFile.Close()
+		} else {
+			chunkSize := fileSize - startBP
+			chunk := make([]byte, chunkSize)
+			file.Read(chunk)
+			wg.Add(1)
+			go readAndSendPointsFromBuffer(socket, chunk, j, *metadata, &wg, subsample, density)
+			j++
+			defer file.Close()
+		}
+	}
+	wg.Wait()
+}
+
 func ProcessFileParts(
 	uploaderId string, 
 	filePartMapping *map[string][]*structs.FilePart,
 	socket *structs.ConcurrentSocket, 
+	options *structs.ProcessingOptions,
 ) {
 	defer utils.TimeTrack(time.Now(), "ProcessFileParts")
 
+	utils.SendProgress("Parsing point cloud file...", socket)
+
 	parts := (*filePartMapping)[uploaderId]
+
+	clusteringFlag, _ := strconv.ParseBool(options.Clustering)
+	subsampleFlag, _ := strconv.ParseBool(options.Subsample)
+	lodFlag, _ := strconv.ParseBool(options.Lod)
+	densityValue, _ := strconv.ParseFloat(options.Density, 64)
 
 	sort.Slice(parts, func(i, j int) bool {
 		return parts[i].ChunkNumber < parts[j].ChunkNumber
@@ -234,6 +393,12 @@ func ProcessFileParts(
 	startBP := int64(headers.PointOffset)
 	windowSize := int64(metadata.PointsInWindow * uint32(headers.StructSize)) // no. of points
 
+	if !clusteringFlag {
+		processWithoutClustering(socket, parts, headers, metadata, subsampleFlag, densityValue)
+		sendDone(socket)		
+		return 
+	}
+
 	o := octree.GenerateOctree(
 		&octree.OctreeDimensions{
 			X1: headers.MinimumBounds[0],
@@ -242,9 +407,8 @@ func ProcessFileParts(
 			Y2: headers.MaximumBounds[2],
 			Z1: headers.MinimumBounds[1],
 			Z2: headers.MaximumBounds[1],
-			Granularity: 7,
+			Granularity: 8,
 		},
-		nil,
 	)
 
 	fmt.Println("OCTREE DIMENSIONS", o.Root.X1, o.Root.X2, o.Root.Y1, o.Root.Y2, o.Root.Z1, o.Root.Z2)
@@ -264,7 +428,7 @@ func ProcessFileParts(
 			file.Read(chunk)
 			pointBeforeTree += len(chunk)
 			wg.Add(1);
-			go LoadData(socket, chunk, metadata, o, &wg)
+			go LoadData(socket, chunk, metadata, o, &wg, subsampleFlag, densityValue)
 			file.Seek(startBP + windowSize, 0)
 			startBP += windowSize
 		}
@@ -290,7 +454,7 @@ func ProcessFileParts(
 			prevChunk = append(prevChunk, nextChunk...)
 			wg.Add(1);
 			pointBeforeTree += len(prevChunk)
-			go LoadData(socket, prevChunk, metadata, o, &wg)
+			go LoadData(socket, prevChunk, metadata, o, &wg, subsampleFlag, densityValue)
 			startBP = nextSize
 
 			defer file.Close()
@@ -301,7 +465,7 @@ func ProcessFileParts(
 			file.Read(chunk)
 			wg.Add(1);
 			pointBeforeTree += len(chunk)
-			go LoadData(socket, chunk, metadata, o, &wg)
+			go LoadData(socket, chunk, metadata, o, &wg, subsampleFlag, densityValue)
 			defer file.Close()
 		}
 	}
@@ -309,6 +473,7 @@ func ProcessFileParts(
 	wg.Wait()
 	fmt.Println("WAIT GROUP DONE")
 
+	utils.SendProgress("Optimizing data...", socket)
 
 	fmt.Println("POINT BEFORE ADDED TO TREE ", pointBeforeTree / int(headers.StructSize))
 
@@ -320,9 +485,11 @@ func ProcessFileParts(
 
 	fmt.Println("POINTS BEFORE CLUSTERING", totalPoints / 7);
 
+	utils.SendProgress("Clustering points...", socket)
+
 	clusteringWg := sync.WaitGroup{}
 
-	octree.ClusterPoints(socket, &o.Leaves, metadata, &clusteringWg);
+	octree.ClusterPoints(socket, &o.Leaves, &clusteringWg);
 
 	clusteringWg.Wait()
 
@@ -331,16 +498,20 @@ func ProcessFileParts(
 	kmeans.GlobalTimetracker.Range(func(key string, value interface{}) bool {
 		fmt.Println(key, value);
 		return true
-
 	});
-
 
 	sendingWg := sync.WaitGroup{}
 
-	sendClusteredPoints(socket, o, &sendingWg)
+	sendClusteredPoints(socket, o, &sendingWg, metadata)
 
 	sendingWg.Wait()
 	
+	if lodFlag {
+		go lod.GenerateAndSendLod(socket, o.Leaves, metadata)
+	}
+
+	go filewriter.CreateOptimisedFile(socket, parts, o.Leaves, headers)
+
 	fmt.Println("DONE SENDING CLUSTERED CHUNKS")
 
 	sendDone(socket);
