@@ -10,3 +10,4 @@ files
 *.njsproj
 *.sln
 *.sw?
+*test
