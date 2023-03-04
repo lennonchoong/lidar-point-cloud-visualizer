@@ -3,10 +3,11 @@ package kdtree
 import (
 	"math"
 	"sync"
+	c "lidar/constants"
 	// "fmt"
 )
 
-var pointOffset int = 7
+var pointOffset int = c.PointOffset
 
 type KDTreeNode struct {
 	Left *KDTreeNode
@@ -104,6 +105,7 @@ func Init(point []float64, left, right *KDTreeNode, axis, size int) *KDTreeNode 
 		wgtCenter[4] += left.WgtCenter[4] 
 		wgtCenter[5] += left.WgtCenter[5] 
 		wgtCenter[6] += left.WgtCenter[6] 
+		wgtCenter[7] += left.WgtCenter[7] 
 	}
 
 	if right != nil {
@@ -115,6 +117,7 @@ func Init(point []float64, left, right *KDTreeNode, axis, size int) *KDTreeNode 
 		wgtCenter[4] += right.WgtCenter[4] 
 		wgtCenter[5] += right.WgtCenter[5] 
 		wgtCenter[6] += right.WgtCenter[6] 
+		wgtCenter[7] += right.WgtCenter[7] 
 	}
 
 	realCenter := make([]float64, pointOffset)
@@ -330,6 +333,7 @@ func merge(left, right []float64, lambda func([]float64, []float64) bool) (resul
 			result[i + 4] = left[l + 4]
 			result[i + 5] = left[l + 5]
 			result[i + 6] = left[l + 6]
+			result[i + 7] = left[l + 7]
 			l += pointOffset
         } else {
             result[i] = right[r]
@@ -339,6 +343,7 @@ func merge(left, right []float64, lambda func([]float64, []float64) bool) (resul
 			result[i + 4] = right[r + 4]
 			result[i + 5] = right[r + 5]
 			result[i + 6] = right[r + 6]
+			result[i + 7] = right[r + 7]
 			r += pointOffset
 		}
         i += pointOffset
@@ -352,6 +357,7 @@ func merge(left, right []float64, lambda func([]float64, []float64) bool) (resul
 		result[i + 4] = left[l + 4]
 		result[i + 5] = left[l + 5]
 		result[i + 6] = left[l + 6]
+		result[i + 7] = left[l + 7]
         i += pointOffset
 		l += pointOffset
     }
@@ -364,6 +370,7 @@ func merge(left, right []float64, lambda func([]float64, []float64) bool) (resul
 		result[i + 4] = right[r + 4]
 		result[i + 5] = right[r + 5]
 		result[i + 6] = right[r + 6]
+		result[i + 7] = right[r + 7]
         i += pointOffset
 		r += pointOffset
     }

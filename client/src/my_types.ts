@@ -94,27 +94,46 @@ export interface DistanceMarker {
 }
 
 export interface AngleMarker {
-    annotations: Annotation[];
-    point1: THREE.Mesh; 
+    pointAnnotationMap: Map<THREE.Mesh, Annotation>;
+    pointLineMap: Map<THREE.Mesh, THREE.Line[]>;
+    linePointMap: Map<THREE.Line, THREE.Mesh[]>;
+    point1: THREE.Mesh;
     point2: THREE.Mesh;
     point3: THREE.Mesh;
-    line1: THREE.Line;
-    line2: THREE.Line;
-    line3: THREE.Line;
+}
+
+export interface AreaMarker {
+    lineAnnotationMap: Map<THREE.Line, Annotation>;
+    pointLineMap: Map<THREE.Mesh, THREE.Line[]>;
+    linePointMap: Map<THREE.Line, THREE.Mesh[]>;
+    point1: THREE.Mesh;
+    point2: THREE.Mesh;
+    point3: THREE.Mesh;
+    point4: THREE.Mesh;
+    areaAnnotation: Annotation;
 }
 
 export function isPointMarker(s: MarkerGroup): s is PointMarker {
-    return (s as PointMarker).point !== undefined
+    return (s as PointMarker).point !== undefined;
 }
 
 export function isDistanceMarker(s: MarkerGroup): s is DistanceMarker {
-    const casted = (s as DistanceMarker)
-    return casted.point1 !== undefined && casted.point2 !== undefined && casted.line !== undefined
+    const casted = s as DistanceMarker;
+    return (
+        casted.point1 !== undefined &&
+        casted.point2 !== undefined &&
+        casted.line !== undefined
+    );
 }
 
 export function isAngleMarker(s: MarkerGroup): s is AngleMarker {
-    const casted = (s as AngleMarker)
-    return casted.annotations !== undefined
+    const casted = s as AngleMarker;
+    return casted.pointAnnotationMap !== undefined;
 }
 
-export type MarkerGroup = PointMarker | DistanceMarker | AngleMarker
+export function isAreaMarker(s: MarkerGroup): s is AreaMarker {
+    const casted = s as AreaMarker;
+    return casted.areaAnnotation !== undefined;
+}
+
+export type MarkerGroup = PointMarker | DistanceMarker | AngleMarker | AreaMarker;

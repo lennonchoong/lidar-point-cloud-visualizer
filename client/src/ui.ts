@@ -1,5 +1,5 @@
 import defaultOptions from "./options";
-import { handleFile } from "./utils";
+import { handleFile, Colors, toHex } from "./utils";
 
 let optionOpen = true;
 
@@ -16,6 +16,15 @@ const sliderInputs = Array.from(document.querySelectorAll("input")).filter(
     (e) => e.type === "range"
 );
 const sliderTooltip = document.getElementById("slider-tooltip");
+// const collapsibles = Array.from(document.querySelectorAll(".collapsible"))
+
+// collapsibles.forEach(d => {
+//     const clicker = d.querySelector(".collapsible-clicker");
+//     clicker?.addEventListener("click", () => {
+//         console.log("CLICKED")
+//         d.querySelector(".collapsible-wrapper")?.classList.toggle("close");
+//     })
+// })
 
 sliderInputs.map((d) => {
     d.addEventListener("mouseenter", (e: MouseEvent) => {
@@ -50,6 +59,10 @@ input?.addEventListener("change", (e) => {
         updateFileDownloadUILoading();
     }
 });
+
+for (let i = 0; i < 12; i++) {
+    (document.getElementById(`color-${i}`) as HTMLInputElement).value = `#${toHex(Colors[i].r)}${toHex(Colors[i].g)}${toHex(Colors[i].b)}`
+}
 
 const fileDownloadOnClick = () => {
     console.log("textClick");

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"lidar/octree"
 	"lidar/structs"
+	c "lidar/constants"
 	"log"
 	"os"
 
@@ -50,9 +51,9 @@ func CreateOptimisedFile(socket *structs.ConcurrentSocket, parts []*structs.File
 
 	scaleX, scaleY, scaleZ := header.Scale[0], header.Scale[1], header.Scale[2]
 
-	fmt.Println("POINTS LENGTH = ", len(points) / 7)
+	fmt.Println("POINTS LENGTH = ", len(points) / c.PointOffset)
 
-	for i := 0; i < len(points); i += 7 {
+	for i := 0; i < len(points); i += c.PointOffset {
 		if points[i] < header.MinimumBounds[0] ||
 		points[i + 1] < header.MinimumBounds[2] ||
 		points[i + 2] < header.MinimumBounds[1] {

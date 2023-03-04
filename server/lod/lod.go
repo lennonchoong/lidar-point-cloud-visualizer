@@ -5,6 +5,7 @@ import (
 	"lidar/kmeans"
 	"lidar/octree"
 	"lidar/structs"
+	"lidar/constants"
 	"sync"
 
 	"github.com/emirpasic/gods/sets/hashset"
@@ -36,7 +37,7 @@ func sendLod(
 			points = append(points, nodePoints...)
 		}
 
-		fmt.Println("LOD POINT LENGTH ", len(points) / 7)
+		fmt.Println("LOD POINT LENGTH ", len(points) / constants.PointOffset)
 
 		socket.Lock.Lock()
 		socket.Conn.WriteJSON(structs.LODChunk{

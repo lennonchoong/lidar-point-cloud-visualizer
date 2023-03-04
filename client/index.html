@@ -68,10 +68,6 @@
                             <label for="z-exaggeration">Z-Exaggeration:</label>
                             <input type="range" name="" min='0' max='100' value='0' id="z-exaggeration">
                         </div>
-                        <div class="checkbox-wrapper">
-                            <label for="clustering">Classification Colours:</label>
-                            <input type="checkbox" name="" id="clustering">
-                        </div>
                     </div>
                     <div class="options-subwrapper">
                         <div class='subwrapper-label'>Camera Options</div>
@@ -108,12 +104,91 @@
                     </div>
                     <div class="options-subwrapper">
                         <div class="subwrapper-label">Tools</div>
-                        <button id="point-measure">Point</button>
-                        <button id="distance-measure">Distance</button>
-                        <button id="height-measure">Height</button>
-                        <button id="area-measure">Area</button>
-                        <button id="angle-measure">Angle</button>
+                        <div class="button-collection">
+                            <button id="point-measure">Point</button>
+                            <button id="distance-measure">Distance</button>
+                            <button id="height-measure">Height</button>
+                            <button id="area-measure">Area</button>
+                            <button id="angle-measure">Angle</button>
+                        </div>
                         <button id="clear-tools">Clear</button>
+                    </div>
+                    <div class="options-subwrapper collapsible">
+                        <div class="collapsible-clicker">
+                            <div class='subwrapper-label'>Classification Colours:</div>
+                            <div class="subwrapper-clicker">
+                                <!-- <svg
+                                    width="24px"
+                                    height="24px"
+                                    stroke-width="1.5"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    color="#000000"
+                                    id="arrow-icon"
+                                >
+                                    <path
+                                        d="M6 9l6 6 6-6"
+                                        stroke="#FFFFFF"
+                                        stroke-width="1.5"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    ></path>
+                                </svg> -->
+                            </div>
+                        </div>
+                        <div class="checkbox-wrapper column">
+                            <div class="collapsible-wrapper">
+                                <div class="color-picker">
+                                    <label for="">Never Classified:</label>
+                                    <input id="color-0" type="color">
+                                </div>
+                                <div class="color-picker">
+                                    <label for="">Unclassified:</label>
+                                    <input id="color-1" type="color">
+                                </div>
+                                <div class="color-picker">
+                                    <label for="">Ground:</label>
+                                    <input id="color-2" type="color">
+                                </div>
+                                <div class="color-picker">
+                                    <label for="">Low Vegetation:</label>
+                                    <input id="color-3" type="color">
+                                </div>
+                                <div class="color-picker">
+                                    <label for="">Medium Vegetation:</label>
+                                    <input id="color-4" type="color">
+                                </div>
+                                <div class="color-picker">
+                                    <label for="">High Vegetation:</label>
+                                    <input id="color-5" type="color">
+                                </div>
+                                <div class="color-picker">
+                                    <label for="">Building:</label>
+                                    <input id="color-6" type="color">
+                                </div>
+                                <div class="color-picker">
+                                    <label for="">Low Point:</label>
+                                    <input id="color-7" type="color">
+                                </div>
+                                <div class="color-picker">
+                                    <label for="">Key Point:</label>
+                                    <input id="color-8" type="color">
+                                </div>
+                                <div class="color-picker">
+                                    <label for="">Water:</label>
+                                    <input id="color-9" type="color">
+                                </div>
+                                <div class="color-picker">
+                                    <label for="">Overlay:</label>
+                                    <input id="color-10" type="color">
+                                </div>
+                                <div class="color-picker">
+                                    <label for="">Default:</label>
+                                    <input id="color-11" type="color">
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div id="footer"></div>
                 </div>

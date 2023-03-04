@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	utils "lidar/loader_utils"
+	c "lidar/constants"
 	"time"
 
 	"github.com/puzpuzpuz/xsync"
@@ -14,7 +15,7 @@ import (
 	// "gonum.org/v1/gonum/spatial/kdtree"
 )
 
-var pointOffset int = 7
+var pointOffset int = c.PointOffset
 var maxIterations int = 10
 
 var GlobalTimetracker = xsync.NewMap()
@@ -107,7 +108,7 @@ func getLabels(points, centroids []float64) map[int]*ClusterLabels {
 	}
 	
 	for i := 0; i < len(points); i += pointOffset {
-		x1, y1, z1, r1, g1, b1, alpha1 := points[i], points[i + 1], points[i + 2], points[i + 3], points[i + 4], points[i + 5], points[i + 6];
+		x1, y1, z1, r1, g1, b1, alpha1, classification1 := points[i], points[i + 1], points[i + 2], points[i + 3], points[i + 4], points[i + 5], points[i + 6], points[i + 7];
 		closestCentroidX, closestCentroidY, closestCentroidZ, closestCentroidIndex, prevDistance := 0.0, 0.0, 0.0, 0 ,0.0;
 		
 		for j := 0; j < len(centroids); j += pointOffset {
@@ -123,7 +124,7 @@ func getLabels(points, centroids []float64) map[int]*ClusterLabels {
 				}
 			}
 		}
-		labels[closestCentroidIndex].points = append(labels[closestCentroidIndex].points, x1, y1, z1, r1, g1, b1, alpha1)
+		labels[closestCentroidIndex].points = append(labels[closestCentroidIndex].points, x1, y1, z1, r1, g1, b1, alpha1, classification1)
 	}
 
 	return labels;
@@ -143,6 +144,7 @@ func getPointsMean(points []float64) []float64 {
 		means[4] = means[4] + points[i + 4] / totalPoints;
 		means[5] = means[5] + points[i + 5] / totalPoints;
 		means[6] = math.Max(means[6], points[i + 6]);
+		means[7] = means[7] + points[i + 7] / totalPoints
 	}
 
 	return means;

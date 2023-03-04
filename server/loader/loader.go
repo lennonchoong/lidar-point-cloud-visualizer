@@ -90,7 +90,7 @@ func LoadData(socket *structs.ConcurrentSocket, buf []byte, m *structs.LASMetaDa
 	bufferLen := int64(len(buf))
 	for i < bufferLen {
 		if !subsample || coinFlip(density) {
-			x, z, y, r, g, b, intensity := pointFormatReader(
+			x, z, y, r, g, b, intensity, classification := pointFormatReader(
 				buf,
 				i, 
 				m.FormatId, 
@@ -110,6 +110,7 @@ func LoadData(socket *structs.ConcurrentSocket, buf []byte, m *structs.LASMetaDa
 				g,
 				b,
 				intensity,
+				classification,
 				0,
 				o.Granularity, 
 				o.Root,
@@ -126,7 +127,7 @@ func pointFormatReader(
 	offset int64, 
 	formatId int32, 
 	scaleX, offsetX, scaleY, offsetY, scaleZ, offsetZ float64,
-) (float64, float64, float64, float64, float64, float64, float64) {
+) (float64, float64, float64, float64, float64, float64, float64, float64) {
 	var r, g, b uint16;
 	x := utils.ReadInt32Single(buffer, offset + 0);
 	y := utils.ReadInt32Single(buffer, offset + 4);
@@ -150,7 +151,8 @@ func pointFormatReader(
 		utils.DetermineColor(r, classification, 0),
 		utils.DetermineColor(g, classification, 1),
 		utils.DetermineColor(b, classification, 2),
-		float64(intensity)
+		float64(intensity),
+		float64(classification)
 }
 
 func getFileMetaData(headers *structs.LASHeaders) *structs.LASMetaData {
@@ -163,8 +165,8 @@ func getFileMetaData(headers *structs.LASHeaders) *structs.LASMetaData {
 
 	pointsInWindow := utils.MinUInt32(100000, headers.PointCount)
 
-	noChunkFromWindow := math.Ceil(float64(pointsInWindow) * 7.0 / float64(constants.SocketChunkSize)) * math.Floor(float64(headers.PointCount) / float64(pointsInWindow))
-	noResidualChunk := math.Ceil(float64(headers.PointCount % pointsInWindow) * 7.0 / float64(constants.SocketChunkSize));
+	noChunkFromWindow := math.Ceil(float64(pointsInWindow) * float64(constants.PointOffset) / float64(constants.SocketChunkSize)) * math.Floor(float64(headers.PointCount) / float64(pointsInWindow))
+	noResidualChunk := math.Ceil(float64(headers.PointCount % pointsInWindow) * float64(constants.PointOffset) / float64(constants.SocketChunkSize));
 	totalSocketChunks := int(noChunkFromWindow + noResidualChunk) 
 
 	return &structs.LASMetaData{
@@ -191,7 +193,7 @@ func sendClusteredPoints(socket *structs.ConcurrentSocket, o *octree.Octree, wg 
 	collector := []float64{}
 	pointsAfter := 0
 	for _, leaf := range o.Leaves {
-		for i := 0; i < len(leaf.Points); i += 7 {
+		for i := 0; i < len(leaf.Points); i += constants.PointOffset {
 			leaf.Points[i] = leaf.Points[i] + m.OffsetX
 			leaf.Points[i + 1] = leaf.Points[i + 1] + m.OffsetZ
 			leaf.Points[i + 2] = leaf.Points[i + 2] + m.OffsetY
@@ -237,7 +239,7 @@ func sendClusteredPoints(socket *structs.ConcurrentSocket, o *octree.Octree, wg 
 		}(collector[i:])
 	}
 
-	fmt.Println("POINTS AFTER ", pointsAfter / 7)
+	fmt.Println("POINTS AFTER ", pointsAfter / constants.PointOffset)
 }
 
 func readAndSendPointsFromBuffer(socket *structs.ConcurrentSocket, buf []byte, idx int, m structs.LASMetaData, wg2 *sync.WaitGroup, subsample bool, density float64) {
@@ -248,7 +250,7 @@ func readAndSendPointsFromBuffer(socket *structs.ConcurrentSocket, buf []byte, i
 
 	for i < bufferLen {
 		if !subsample || coinFlip(density) {
-			x, z, y, r, g, b, intensity := pointFormatReader(
+			x, z, y, r, g, b, intensity, classification := pointFormatReader(
 				buf,
 				i, 
 				m.FormatId, 
@@ -259,7 +261,7 @@ func readAndSendPointsFromBuffer(socket *structs.ConcurrentSocket, buf []byte, i
 				m.ScaleZ, 
 				m.OffsetZ,
 			);
-			temp = append(temp, x + m.OffsetX, z + m.OffsetZ, y + m.OffsetY, r, g, b, intensity)
+			temp = append(temp, x + m.OffsetX, z + m.OffsetZ, y + m.OffsetY, r, g, b, intensity, classification)
 		}
 		
 		i += m.StructSize;
@@ -483,7 +485,7 @@ func ProcessFileParts(
 		totalPoints += len(leaf.Points)
 	}
 
-	fmt.Println("POINTS BEFORE CLUSTERING", totalPoints / 7);
+	fmt.Println("POINTS BEFORE CLUSTERING", totalPoints / constants.PointOffset);
 
 	utils.SendProgress("Clustering points...", socket)
 

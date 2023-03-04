@@ -115,3 +115,94 @@ export const pointFormatReaders: { [key: number]: PointFormatReader } = {
         };
     },
 };
+
+export const toHex = (num: number) => {
+    let color = num.toString(16);
+    if (color.length < 2) {
+        color = "0" + color
+    }
+    return color 
+}
+
+export const Colors: {[key: number]: {r: number, g: number, b: number}} = {
+    0: {
+        r: 255,
+        g: 255,
+        b: 255,
+    }, 
+    1: {
+        r: 255,
+        g: 255,
+        b: 255,
+    }, 
+    2: {
+        r: 161,
+        g: 82,
+        b: 46,
+    }, 
+    3: {
+        r: 0,
+        g: 255,
+        b: 1,
+    }, 
+    4: {
+        r: 0,
+        g: 204,
+        b: 0,
+    }, 
+    5: {
+        r: 0,
+        g: 153,
+        b: 0,
+    }, 
+    6: {
+        r: 255,
+        g: 168,
+        b: 0,
+    },
+    7: {
+        r: 255,
+        g: 0,
+        b: 255,
+    },
+    8: {
+        r: 0,
+        g: 0,
+        b: 255,
+    },
+    9: {
+        r: 255,
+        g: 255,
+        b: 255,
+    },
+    10: {
+        r: 255,
+        g: 255,
+        b: 0,
+    },
+    11: {
+        r: 255,
+        g: 255,
+        b: 0,
+    },
+    12: {
+        r: 255,
+        g: 255,
+        b: 0,
+    },
+    13: {
+        r: 255,
+        g: 255,
+        b: 0,
+    },
+    14: {
+        r: 255,
+        g: 255,
+        b: 0,
+    },
+    15: {
+        r: 255,
+        g: 255,
+        b: 0,
+    },
+}

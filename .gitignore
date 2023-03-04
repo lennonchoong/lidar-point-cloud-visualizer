@@ -10,4 +10,5 @@ files
 *.njsproj
 *.sln
 *.sw?
-*test
+test.txt
+test2.txt

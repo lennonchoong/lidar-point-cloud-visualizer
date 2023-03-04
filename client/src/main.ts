@@ -4,7 +4,7 @@ import vertexShader from "./glsl/vertex_shader";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { Annotation, Camera, LASHeaders, SphereMarker } from "./my_types";
 import Socket from "./socket";
-import { cleanUp } from "./utils";
+import { cleanUp, Colors } from "./utils";
 import defaultOptions from "./options";
 
 declare global {
@@ -25,6 +25,7 @@ declare global {
         markerSphereMeshes: SphereMarker[];
         annotations: Annotation[];
         controls: OrbitControls;
+        plane: THREE.Mesh;
     }
 }
 
@@ -43,6 +44,9 @@ const material = new THREE.ShaderMaterial({
         },
         zexag: {
             value: 0,
+        },
+        colormap: {
+            value: Array.from(Object.values(Colors).map(d => new THREE.Vector3(d.r, d.g, d.b))),
         },
     },
 });
@@ -63,7 +67,7 @@ const glRenderer = document.getElementById("gl-container");
 let camera: Camera = new THREE.PerspectiveCamera(
     75,
     window.innerWidth / window.innerHeight,
-    0.1,
+    0.01,
     3000
 );
 
@@ -76,17 +80,45 @@ let controls: OrbitControls | null = new OrbitControls(
 
 window["controls"] = controls;
 
+function addPlane(
+    width: number,
+    length: number,
+    x: number,
+    y: number,
+    z: number
+) {
+    const geometry = new THREE.PlaneGeometry(width, length);
+    const material = new THREE.MeshBasicMaterial({
+        color: 0xffff00,
+        side: THREE.DoubleSide,
+        transparent: true,
+    });
+    material.opacity = 0;
+    const plane = new THREE.Mesh(geometry, material);
+    window["geometry"].push(geometry);
+    window["material"].push(material);
+    window['plane'] = plane;
+    plane.position.x = x;
+    plane.position.y = y;
+    plane.position.z = z;
+    plane.rotateX(THREE.MathUtils.degToRad(90));
+    scene.add(plane);
+}
+
 function loadPoints(points: number[], header: LASHeaders) {
-    console.log(header)
+    console.log(header);
     cleanUp();
 
     const vertices = [];
     const colors = [];
+    const classification = [];
     let maxIntensity = -Infinity;
+    console.log(`number of points ${points.length / 8}`)
 
-    for (let i = 0; i < points.length; i += 7) {
+    for (let i = 0; i < points.length; i += 8) {
         vertices.push(points[i], points[i + 1], points[i + 2]);
         colors.push(points[i + 3], points[i + 4], points[i + 5], points[i + 6]);
+        classification.push(points[i + 7]);
         maxIntensity = Math.max(maxIntensity, points[i + 6]);
     }
 
@@ -103,6 +135,11 @@ function loadPoints(points: number[], header: LASHeaders) {
         "colors",
         new THREE.Float32BufferAttribute(colors, 4)
     );
+
+    geometry.setAttribute(
+        "classification",
+        new THREE.Int32BufferAttribute(classification, 1)
+    )
 
     positionCamera(header);
 
@@ -114,6 +151,11 @@ function loadPoints(points: number[], header: LASHeaders) {
 
     scene.add(pointThree);
 
+    const width = header.MaximumBounds[0] - header.MinimumBounds[0];
+    const height = header.MaximumBounds[1] - header.MinimumBounds[1];
+    const z = (header.MaximumBounds[2] - header.MinimumBounds[2]) / 2;
+    addPlane(width, height, 0, -z, 0);
+
     animate();
 }
 
@@ -123,13 +165,15 @@ function processPoints(points: number[]): {
 } {
     const vertices = [];
     const colors = [];
+    const classification = [];
     let maxIntensity = -Infinity;
-
+    console.log(`number of points ${points.length / 8}`)
     const geometry = new THREE.BufferGeometry();
 
-    for (let i = 0; i < points.length; i += 7) {
+    for (let i = 0; i < points.length; i += 8) {
         vertices.push(points[i], points[i + 1], points[i + 2]);
         colors.push(points[i + 3], points[i + 4], points[i + 5], points[i + 6]);
+        classification.push(points[i + 7]);
         maxIntensity = Math.max(maxIntensity, points[i + 6]);
     }
 
@@ -146,6 +190,11 @@ function processPoints(points: number[]): {
         "colors",
         new THREE.Float32BufferAttribute(colors, 4)
     );
+
+    geometry.setAttribute(
+        "classification",
+        new THREE.Int32BufferAttribute(classification, 1)
+    )
 
     window["geometry"].push(geometry);
 
@@ -160,6 +209,9 @@ function processPoints(points: number[]): {
             },
             zexag: {
                 value: 0,
+            },
+            colormap: {
+                value: Array.from(Object.values(Colors).map(d => new THREE.Vector3(d.r, d.g, d.b))),
             },
         },
     });
@@ -203,30 +255,33 @@ function positionCamera(header: LASHeaders) {
 }
 
 const positionAnnotations = () => {
-    window["annotations"].forEach(({element, x, yAdjusted, z, heightOffset}) => {
-        const vector = new THREE.Vector3(x, yAdjusted, z);
-        vector.project(window["camera"]);
+    window["annotations"].forEach(
+        ({ element, x, yAdjusted, z, heightOffset }) => {
+            const vector = new THREE.Vector3(x, yAdjusted, z);
+            vector.project(window["camera"]);
+            vector.x = Math.round((0.5 + vector.x / 2) * window.innerWidth);
+            vector.y = Math.round((0.5 - vector.y / 2) * window.innerHeight);
 
-        vector.x = Math.round(
-            (0.5 + vector.x / 2) * (window.innerWidth / window.devicePixelRatio)
-        ) * 2;
-        vector.y = Math.round(
-            (0.5 - vector.y / 2) * (window.innerHeight / window.devicePixelRatio)
-        ) * 2;
-        
-        const styles = getComputedStyle(element);
-        element.style.opacity = vector.z >= 1 ? "0" : "1";
-        element.style.top = `${vector.y - parseFloat(styles.height) - heightOffset}px`;
-        element.style.left = `${vector.x - parseFloat(styles.width) * 0.5}px`;
-    })
-}
+            const styles = getComputedStyle(element);
+            element.style.opacity = vector.z >= 1 ? "0" : "1";
+            element.style.top = `${
+                vector.y - parseFloat(styles.height) - heightOffset
+            }px`;
+            element.style.left = `${
+                vector.x - parseFloat(styles.width) * 0.5
+            }px`;
+        }
+    );
+};
 
 const resizeMarkers = () => {
-    window["markerSphereMeshes"].forEach(({mesh}) => {
-        const distance = camera.position.distanceTo(mesh.position)
-        mesh.scale.set(distance / 100, distance / 100, distance / 100)
-    })
-}
+    window["markerSphereMeshes"].forEach(({ mesh }) => {
+        const distance = camera.position.distanceTo(mesh.position);
+        const fovScale = camera instanceof THREE.PerspectiveCamera ? camera.fov / 75 : 1;
+        const scale = distance / 100 * fovScale
+        mesh.scale.set(scale, scale, scale);
+    });
+};
 
 function animate() {
     cancelAnimationFrame(window["animationId"]);
@@ -289,17 +344,18 @@ document.getElementById("z-exaggeration")?.addEventListener("input", (e) => {
 
     defaultOptions.zExag = value;
 
-    window["annotations"].forEach(d => {
+    window["annotations"].forEach((d) => {
         const { y } = d;
         const newY = y * (1.0 + 2.0 * (value / 100.0));
         d.yAdjusted = newY;
-    })
-    
+    });
+
     window["markerSphereMeshes"].forEach(({ mesh, x, y, z }) => {
         const newY = y * (1.0 + 2.0 * (value / 100.0));
-        mesh.position.set(x, newY, z)
-    })
+        mesh.position.set(x, newY, z);
+    });
 
+    window["plane"].position.y = value;
     window["highLodMaterial"].uniforms.zexag.value = value;
     if (window["medLodMaterial"]) {
         window["medLodMaterial"].uniforms.zexag.value = value;
@@ -310,13 +366,33 @@ document.getElementById("z-exaggeration")?.addEventListener("input", (e) => {
     }
 });
 
+document.querySelectorAll("input[type='color']").forEach((d, i) => {
+    d.addEventListener("change", (e) => {
+        const val = (e.target as HTMLInputElement).value
+        Colors[i].r = parseInt(val.slice(1, 3), 16)
+        Colors[i].g = parseInt(val.slice(3, 5), 16)
+        Colors[i].b = parseInt(val.slice(5, 7), 16)
+
+        const updateColorMap = Array.from(Object.values(Colors).map(d => new THREE.Vector3(d.r, d.g, d.b)));
+
+        window["highLodMaterial"].uniforms.colormap.value = updateColorMap;
+        if (window["medLodMaterial"]) {
+            window["medLodMaterial"].uniforms.colormap.value = updateColorMap;
+        }
+
+        if (window["lowLodMaterial"]) {
+            window["lowLodMaterial"].uniforms.colormap.value = updateColorMap;
+        }
+    })
+})
+
 window.addEventListener("update-camera", () => {
     const cameraType = defaultOptions["camera"];
     if (cameraType === 1) {
         camera = new THREE.PerspectiveCamera(
             75,
             window.innerWidth / window.innerHeight,
-            0.1,
+            0.01,
             3000
         );
     } else if (cameraType === 2 || cameraType === 3) {
@@ -351,11 +427,11 @@ window.addEventListener("update-camera", () => {
 new Socket("ws://localhost:8080/ws").connect(loadPoints);
 
 Promise.all([
-    fetch("http://localhost:8080/test").then(d => d.json()),
-    fetch("http://localhost:8080/test2").then(d => d.json()),
+    fetch("http://localhost:8080/test").then((d) => d.json()),
+    fetch("http://localhost:8080/test2").then((d) => d.json()),
 ]).then(([x, y]) => {
-    loadPoints(x, y)
-})
+    loadPoints(x, y);
+});
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 

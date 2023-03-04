@@ -169,10 +169,10 @@ type CounterLock struct {
 	M sync.Mutex
 }
 
-func AddPoint(x, y, z, r, g, b, alpha float64, depth, granularity int, node *OctreeNode, tree *Octree) {
+func AddPoint(x, y, z, r, g, b, alpha, classification float64, depth, granularity int, node *OctreeNode, tree *Octree) {
 	if (depth == granularity) {
 		node.Mutex.Lock()
-		node.Points = append(node.Points, x, y, z, r, g, b, alpha);
+		node.Points = append(node.Points, x, y, z, r, g, b, alpha, classification);
 		node.Mutex.Unlock()
 
 		if (!node.Active) {
@@ -190,7 +190,7 @@ func AddPoint(x, y, z, r, g, b, alpha float64, depth, granularity int, node *Oct
 			child.X1 <= x && x <= child.X2 &&
 			child.Y1 <= y && y <= child.Y2 &&
 			child.Z1 <= z && z <= child.Z2) {
-			AddPoint(x, y, z, r, g, b, alpha, depth + 1, granularity, child, tree);
+			AddPoint(x, y, z, r, g, b, alpha, classification, depth + 1, granularity, child, tree);
 			break;
 		}
 	}
